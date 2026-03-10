@@ -4,7 +4,6 @@ from aerich import Command
 from fastapi import FastAPI
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
-from tortoise.expressions import Q
 
 from app.api import api_router
 from app.controllers.api import api_controller
@@ -78,108 +77,198 @@ async def init_superuser():
         )
 
 
+async def upsert_menu(**payload):
+    menu = await Menu.filter(path=payload["path"], parent_id=payload["parent_id"]).first()
+    if menu:
+        menu.update_from_dict(payload)
+        await menu.save()
+        return menu
+    return await Menu.create(**payload)
+
+
 async def init_menus():
-    menus = await Menu.exists()
-    if not menus:
-        parent_menu = await Menu.create(
-            menu_type=MenuType.CATALOG,
-            name="系统管理",
-            path="/system",
-            order=1,
-            parent_id=0,
-            icon="carbon:gui-management",
-            is_hidden=False,
-            component="Layout",
-            keepalive=False,
-            redirect="/system/user",
-        )
-        children_menu = [
-            Menu(
-                menu_type=MenuType.MENU,
-                name="用户管理",
-                path="user",
-                order=1,
-                parent_id=parent_menu.id,
-                icon="material-symbols:person-outline-rounded",
-                is_hidden=False,
-                component="/system/user",
-                keepalive=False,
-            ),
-            Menu(
-                menu_type=MenuType.MENU,
-                name="角色管理",
-                path="role",
-                order=2,
-                parent_id=parent_menu.id,
-                icon="carbon:user-role",
-                is_hidden=False,
-                component="/system/role",
-                keepalive=False,
-            ),
-            Menu(
-                menu_type=MenuType.MENU,
-                name="菜单管理",
-                path="menu",
-                order=3,
-                parent_id=parent_menu.id,
-                icon="material-symbols:list-alt-outline",
-                is_hidden=False,
-                component="/system/menu",
-                keepalive=False,
-            ),
-            Menu(
-                menu_type=MenuType.MENU,
-                name="API管理",
-                path="api",
-                order=4,
-                parent_id=parent_menu.id,
-                icon="ant-design:api-outlined",
-                is_hidden=False,
-                component="/system/api",
-                keepalive=False,
-            ),
-            Menu(
-                menu_type=MenuType.MENU,
-                name="部门管理",
-                path="dept",
-                order=5,
-                parent_id=parent_menu.id,
-                icon="mingcute:department-line",
-                is_hidden=False,
-                component="/system/dept",
-                keepalive=False,
-            ),
-            Menu(
-                menu_type=MenuType.MENU,
-                name="审计日志",
-                path="auditlog",
-                order=6,
-                parent_id=parent_menu.id,
-                icon="ph:clipboard-text-bold",
-                is_hidden=False,
-                component="/system/auditlog",
-                keepalive=False,
-            ),
-        ]
-        await Menu.bulk_create(children_menu)
-        await Menu.create(
+    system_menu = await upsert_menu(
+        menu_type=MenuType.CATALOG,
+        name="系统管理",
+        path="/system",
+        order=1,
+        parent_id=0,
+        icon="carbon:gui-management",
+        is_hidden=False,
+        component="Layout",
+        keepalive=False,
+        redirect="/system/user",
+    )
+    system_children = [
+        dict(
             menu_type=MenuType.MENU,
-            name="一级菜单",
-            path="/top-menu",
-            order=2,
-            parent_id=0,
-            icon="material-symbols:featured-play-list-outline",
+            name="用户管理",
+            path="user",
+            order=1,
+            parent_id=system_menu.id,
+            icon="material-symbols:person-outline-rounded",
             is_hidden=False,
-            component="/top-menu",
+            component="/system/user",
             keepalive=False,
             redirect="",
-        )
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="角色管理",
+            path="role",
+            order=2,
+            parent_id=system_menu.id,
+            icon="carbon:user-role",
+            is_hidden=False,
+            component="/system/role",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="菜单管理",
+            path="menu",
+            order=3,
+            parent_id=system_menu.id,
+            icon="material-symbols:list-alt-outline",
+            is_hidden=False,
+            component="/system/menu",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="API管理",
+            path="api",
+            order=4,
+            parent_id=system_menu.id,
+            icon="ant-design:api-outlined",
+            is_hidden=False,
+            component="/system/api",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="部门管理",
+            path="dept",
+            order=5,
+            parent_id=system_menu.id,
+            icon="mingcute:department-line",
+            is_hidden=False,
+            component="/system/dept",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="审计日志",
+            path="auditlog",
+            order=6,
+            parent_id=system_menu.id,
+            icon="ph:clipboard-text-bold",
+            is_hidden=False,
+            component="/system/auditlog",
+            keepalive=False,
+            redirect="",
+        ),
+    ]
+    for item in system_children:
+        await upsert_menu(**item)
+
+    await upsert_menu(
+        menu_type=MenuType.MENU,
+        name="一级菜单",
+        path="/top-menu",
+        order=2,
+        parent_id=0,
+        icon="material-symbols:featured-play-list-outline",
+        is_hidden=False,
+        component="/top-menu",
+        keepalive=False,
+        redirect="",
+    )
+
+    interview_menu = await upsert_menu(
+        menu_type=MenuType.CATALOG,
+        name="AI面试运营",
+        path="/interview-admin",
+        order=3,
+        parent_id=0,
+        icon="hugeicons:artificial-intelligence-04",
+        is_hidden=False,
+        component="Layout",
+        keepalive=False,
+        redirect="/interview-admin/candidate",
+    )
+    interview_children = [
+        dict(
+            menu_type=MenuType.MENU,
+            name="候选人管理",
+            path="candidate",
+            order=1,
+            parent_id=interview_menu.id,
+            icon="solar:user-id-bold-duotone",
+            is_hidden=False,
+            component="/interview-admin/candidate",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="面试岗位管理",
+            path="position",
+            order=2,
+            parent_id=interview_menu.id,
+            icon="streamline:ai-industry-spark-solid",
+            is_hidden=False,
+            component="/interview-admin/position",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="岗位JD管理",
+            path="jd",
+            order=3,
+            parent_id=interview_menu.id,
+            icon="ph:file-text-duotone",
+            is_hidden=False,
+            component="/interview-admin/jd",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="面试场次管理",
+            path="interview",
+            order=4,
+            parent_id=interview_menu.id,
+            icon="mdi:head-question-outline",
+            is_hidden=False,
+            component="/interview-admin/interview",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="面试报告档案",
+            path="report",
+            order=5,
+            parent_id=interview_menu.id,
+            icon="solar:chart-square-bold-duotone",
+            is_hidden=False,
+            component="/interview-admin/report",
+            keepalive=False,
+            redirect="",
+        ),
+    ]
+    for item in interview_children:
+        await upsert_menu(**item)
 
 
 async def init_apis():
-    apis = await api_controller.model.exists()
-    if not apis:
-        await api_controller.refresh_api()
+    await api_controller.refresh_api()
 
 
 async def init_db():
@@ -200,29 +289,28 @@ async def init_db():
     await command.upgrade(run_in_transaction=True)
 
 
+async def ensure_role(name: str, desc: str):
+    role = await Role.filter(name=name).first()
+    if role:
+        role.desc = desc
+        await role.save()
+        return role
+    return await Role.create(name=name, desc=desc)
+
+
 async def init_roles():
-    roles = await Role.exists()
-    if not roles:
-        admin_role = await Role.create(
-            name="管理员",
-            desc="管理员角色",
-        )
-        user_role = await Role.create(
-            name="普通用户",
-            desc="普通用户角色",
-        )
+    admin_role = await ensure_role("管理员", "管理员角色")
+    await ensure_role("普通用户", "普通用户角色")
+    await ensure_role("候选人", "候选人门户角色")
 
-        # 分配所有API给管理员角色
-        all_apis = await Api.all()
+    all_apis = await Api.all()
+    all_menus = await Menu.all()
+    await admin_role.apis.clear()
+    if all_apis:
         await admin_role.apis.add(*all_apis)
-        # 分配所有菜单给管理员和普通用户
-        all_menus = await Menu.all()
+    await admin_role.menus.clear()
+    if all_menus:
         await admin_role.menus.add(*all_menus)
-        await user_role.menus.add(*all_menus)
-
-        # 为普通用户分配基本API
-        basic_apis = await Api.filter(Q(method__in=["GET"]) | Q(tags="基础模块"))
-        await user_role.apis.add(*basic_apis)
 
 
 async def init_data():

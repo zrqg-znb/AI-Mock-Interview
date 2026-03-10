@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter
 
+from app.controllers.candidate import candidate_controller
 from app.controllers.user import user_controller
 from app.core.ctx import CTX_USER_ID
 from app.core.dependency import DependAuth
@@ -42,7 +43,10 @@ async def get_userinfo():
     user_id = CTX_USER_ID.get()
     user_obj = await user_controller.get(id=user_id)
     data = await user_obj.to_dict(exclude_fields=["password"])
-    data["avatar"] = "https://avatars.githubusercontent.com/u/54677442?v=4"
+    candidate = await candidate_controller.get_by_user_id(user_id)
+    data["avatar"] = candidate.avatar if candidate and candidate.avatar else "https://avatars.githubusercontent.com/u/54677442?v=4"
+    data["candidate_profile_id"] = candidate.id if candidate else None
+    data["candidate_ready"] = bool(candidate and (candidate.resume_text or candidate.skill_tags))
     return Success(data=data)
 
 

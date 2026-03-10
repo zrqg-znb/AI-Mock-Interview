@@ -45,6 +45,10 @@ class Settings(BaseSettings):
         "use_tz": False,  # Whether to use timezone-aware datetimes
         "timezone": "Asia/Shanghai",  # Timezone setting
     }
+    AI_API_KEY: str = ""
+    AI_BASE_URL: str = ""
+    AI_MODEL_NAME: str = ""
+    AI_REQUEST_TIMEOUT: int = 60
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
 

@@ -2,11 +2,12 @@ import i18n from '~/i18n'
 const { t } = i18n.global
 
 const Layout = () => import('@/layout/index.vue')
+const PortalLayout = () => import('@/views/ai-portal/layout.vue')
 
 export const basicRoutes = [
   {
     path: '/',
-    redirect: '/workbench', // 默认跳转到首页
+    redirect: '/workbench',
     meta: { order: 0 },
   },
   {
@@ -26,6 +27,99 @@ export const basicRoutes = [
       },
     ],
     meta: { order: 1 },
+  },
+  {
+    name: 'AIPortal',
+    path: '/ai-interview',
+    component: PortalLayout,
+    redirect: '/ai-interview/dashboard',
+    children: [
+      {
+        path: 'dashboard',
+        component: () => import('@/views/ai-portal/dashboard/index.vue'),
+        name: 'AIInterviewDashboard',
+        meta: {
+          title: 'AI 面试舱',
+          icon: 'hugeicons:artificial-intelligence-04',
+          affix: true,
+        },
+      },
+      {
+        path: 'resume',
+        component: () => import('@/views/ai-portal/resume/index.vue'),
+        name: 'AIInterviewResume',
+        isHidden: true,
+        meta: {
+          title: '简历中心',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'positions',
+        component: () => import('@/views/ai-portal/positions/index.vue'),
+        name: 'AIInterviewPositions',
+        isHidden: true,
+        meta: {
+          title: '岗位推荐',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'positions/:id',
+        component: () => import('@/views/ai-portal/position-detail/index.vue'),
+        name: 'AIInterviewPositionDetail',
+        isHidden: true,
+        meta: {
+          title: '岗位详情',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'room/:sessionId',
+        component: () => import('@/views/ai-portal/room/index.vue'),
+        name: 'AIInterviewRoom',
+        isHidden: true,
+        meta: {
+          title: '面试房间',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'reports',
+        component: () => import('@/views/ai-portal/reports/index.vue'),
+        name: 'AIInterviewReports',
+        isHidden: true,
+        meta: {
+          title: '报告中心',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'reports/:reportId',
+        component: () => import('@/views/ai-portal/report-detail/index.vue'),
+        name: 'AIInterviewReportDetail',
+        isHidden: true,
+        meta: {
+          title: '报告详情',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+      {
+        path: 'reports/session/:sessionId',
+        component: () => import('@/views/ai-portal/report-detail/index.vue'),
+        name: 'AIInterviewReportSessionDetail',
+        isHidden: true,
+        meta: {
+          title: '报告详情',
+          activeMenu: 'AIInterviewDashboard',
+        },
+      },
+    ],
+    meta: {
+      title: 'AI 面试舱',
+      icon: 'hugeicons:artificial-intelligence-04',
+      order: 2,
+    },
   },
   {
     name: t('views.profile.label_profile'),
@@ -137,7 +231,6 @@ Object.keys(modules).forEach((key) => {
   asyncRoutes.push(modules[key].default)
 })
 
-// 加载 views 下每个模块的 index.vue 文件
 const vueModules = import.meta.glob('@/views/**/index.vue')
 
 export { asyncRoutes, vueModules }

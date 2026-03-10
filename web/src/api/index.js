@@ -12,8 +12,8 @@ export default {
   getUserById: (params = {}) => request.get('/user/get', { params }),
   createUser: (data = {}) => request.post('/user/create', data),
   updateUser: (data = {}) => request.post('/user/update', data),
-  deleteUser: (params = {}) => request.delete(`/user/delete`, { params }),
-  resetPassword: (data = {}) => request.post(`/user/reset_password`, data),
+  deleteUser: (params = {}) => request.delete('/user/delete', { params }),
+  resetPassword: (data = {}) => request.post('/user/reset_password', data),
   // role
   getRoleList: (params = {}) => request.get('/role/list', { params }),
   createRole: (data = {}) => request.post('/role/create', data),
@@ -39,4 +39,47 @@ export default {
   deleteDept: (params = {}) => request.delete('/dept/delete', { params }),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
+  // candidate admin
+  getCandidateList: (params = {}) => request.get('/candidate/list', { params }),
+  getCandidateById: (params = {}) => request.get('/candidate/get', { params }),
+  createCandidate: (data = {}) => request.post('/candidate/create', data),
+  updateCandidate: (data = {}) => request.post('/candidate/update', data),
+  deleteCandidate: (params = {}) => request.delete('/candidate/delete', { params }),
+  // position admin
+  getPositionList: (params = {}) => request.get('/position/list', { params }),
+  getPositionById: (params = {}) => request.get('/position/get', { params }),
+  createPosition: (data = {}) => request.post('/position/create', data),
+  updatePosition: (data = {}) => request.post('/position/update', data),
+  deletePosition: (params = {}) => request.delete('/position/delete', { params }),
+  // jd admin
+  getJDList: (params = {}) => request.get('/jd/list', { params }),
+  getJDById: (params = {}) => request.get('/jd/get', { params }),
+  createJD: (data = {}) => request.post('/jd/create', data),
+  updateJD: (data = {}) => request.post('/jd/update', data),
+  deleteJD: (params = {}) => request.delete('/jd/delete', { params }),
+  // interview admin
+  getInterviewList: (params = {}) => request.get('/interview/list', { params }),
+  getInterviewById: (params = {}) => request.get('/interview/get', { params }),
+  createInterview: (data = {}) => request.post('/interview/create', data),
+  updateInterview: (data = {}) => request.post('/interview/update', data),
+  deleteInterview: (params = {}) => request.delete('/interview/delete', { params }),
+  // report admin
+  getReportList: (params = {}) => request.get('/report/list', { params }),
+  getReportById: (params = {}) => request.get('/report/get', { params }),
+  createReport: (data = {}) => request.post('/report/create', data),
+  updateReport: (data = {}) => request.post('/report/update', data),
+  deleteReport: (params = {}) => request.delete('/report/delete', { params }),
+  // candidate portal
+  getCandidatePortalProfile: () => request.get('/candidate_portal/profile'),
+  saveCandidatePortalProfile: (data = {}) => request.post('/candidate_portal/profile', data),
+  getCandidatePortalDashboard: () => request.get('/candidate_portal/dashboard'),
+  getCandidatePortalReports: (params = {}) => request.get('/candidate_portal/reports', { params }),
+  // recommendation and mock interview
+  getJobRecommendList: (params = {}) => request.get('/job_recommend/list', { params }),
+  getJobRecommendDetail: (params = {}) => request.get('/job_recommend/detail', { params }),
+  startMockInterview: (data = {}) => request.post('/mock_interview/start', data),
+  submitMockInterviewSegment: (data = {}) => request.post('/mock_interview/submit_segment', data),
+  nextMockInterviewQuestion: (data = {}) => request.post('/mock_interview/next_question', data),
+  finishMockInterview: (data = {}) => request.post('/mock_interview/finish', data),
+  getMockInterviewReport: (params = {}) => request.get('/mock_interview/report', { params }),
 }
