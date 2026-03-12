@@ -26,7 +26,7 @@ import { useCRUD } from '@/composables'
 import api from '@/api'
 import TheIcon from '@/components/icon/TheIcon.vue'
 
-defineOptions({ name: '角色管理' })
+defineOptions({ name: '权限角色' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -166,7 +166,7 @@ const columns = [
                 ),
                 [[vPermission, 'delete/api/v1/role/delete']]
               ),
-            default: () => h('div', {}, '确定删除该角色吗?'),
+            default: () => h('div', {}, '确认删除这个角色吗？'),
           }
         ),
         withDirectives(
@@ -201,7 +201,7 @@ const columns = [
               },
             },
             {
-              default: () => '设置权限',
+              default: () => '分配权限',
               icon: renderIcon('material-symbols:edit-outline', { size: 16 }),
             }
           ),
@@ -230,7 +230,7 @@ async function updateRoleAuthorized() {
     api_infos: apiInfos,
   })
   if (code === 200) {
-    $message?.success('设置成功')
+    $message?.success('权限已更新')
   } else {
     $message?.error(msg)
   }
@@ -243,10 +243,10 @@ async function updateRoleAuthorized() {
 </script>
 
 <template>
-  <CommonPage show-footer title="角色列表">
+  <CommonPage show-footer title="权限角色">
     <template #action>
       <NButton v-permission="'post/api/v1/role/create'" type="primary" @click="handleAdd">
-        <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建角色
+        <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新增角色
       </NButton>
     </template>
 
@@ -262,7 +262,7 @@ async function updateRoleAuthorized() {
             v-model:value="queryItems.role_name"
             clearable
             type="text"
-            placeholder="请输入角色名"
+            placeholder="按角色名称检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
@@ -295,7 +295,7 @@ async function updateRoleAuthorized() {
           <NInput v-model:value="modalForm.name" placeholder="请输入角色名称" />
         </NFormItem>
         <NFormItem label="角色描述" path="desc">
-          <NInput v-model:value="modalForm.desc" placeholder="请输入角色描述" />
+          <NInput v-model:value="modalForm.desc" placeholder="请输入角色职责说明" />
         </NFormItem>
       </NForm>
     </CrudModal>
@@ -307,7 +307,7 @@ async function updateRoleAuthorized() {
             <NInput
               v-model:value="pattern"
               type="text"
-              placeholder="筛选"
+              placeholder="按名称筛选权限项"
               style="flex-grow: 1"
             ></NInput>
           </NGi>
@@ -316,12 +316,12 @@ async function updateRoleAuthorized() {
               v-permission="'post/api/v1/role/authorized'"
               type="info"
               @click="updateRoleAuthorized"
-              >确定</NButton
+              >保存</NButton
             >
           </NGi>
         </NGrid>
         <NTabs>
-          <NTabPane name="menu" tab="菜单权限" display-directive="show">
+          <NTabPane name="menu" tab="菜单访问" display-directive="show">
             <!-- TODO：级联 -->
             <NTree
               :data="menuOption"
@@ -337,7 +337,7 @@ async function updateRoleAuthorized() {
               @update:checked-keys="(v) => (menu_ids = v)"
             />
           </NTabPane>
-          <NTabPane name="resource" tab="接口权限" display-directive="show">
+          <NTabPane name="resource" tab="接口访问" display-directive="show">
             <NTree
               ref="apiTree"
               :data="apiOption"
@@ -355,7 +355,7 @@ async function updateRoleAuthorized() {
             />
           </NTabPane>
         </NTabs>
-        <template #header> 设置权限 </template>
+        <template #header> 角色权限配置 </template>
       </NDrawerContent>
     </NDrawer>
   </CommonPage>

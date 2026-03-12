@@ -1,6 +1,6 @@
 {
   "lang": "中文",
-  "app_name": "Vue FastAPI Admin",
+  "app_name": "AI 模拟面试系统",
   "header": {
     "label_profile": "个人信息",
     "label_logout": "退出登录",
@@ -11,18 +11,23 @@
   "views": {
     "login": {
       "text_login": "登录",
-      "message_input_username_password": "请输入用户名和密码",
-      "message_verifying": "正在验证...",
-      "message_login_success": "登录成功"
+      "message_input_username_password": "请输入账号和密码",
+      "message_verifying": "正在校验登录信息...",
+      "message_login_success": "登录成功，正在进入工作台",
+      "text_portal": "运营后台登录",
+      "text_subtitle": "进入 AI 模拟面试系统，统一管理账号权限、业务配置、练习链路和报告归档。",
+      "text_hint": "候选人账号由后台统一创建，登录后默认进入运营工作台。",
+      "placeholder_username": "请输入账号",
+      "placeholder_password": "请输入密码"
     },
     "workbench": {
       "label_workbench": "工作台",
-      "text_hello": "hello, {username}",
-      "text_welcome": "今天又是元气满满的一天!",
-      "label_number_of_items": "项目数",
-      "label_upcoming": "待办",
-      "label_information": "消息",
-      "label_project": "项目",
+      "text_hello": "你好，{username}",
+      "text_welcome": "这里集中查看运营状态、练习链路和 AI 服务可用性。",
+      "label_number_of_items": "候选人档案",
+      "label_upcoming": "进行中场次",
+      "label_information": "报告归档",
+      "label_project": "快捷入口",
       "label_more": "更多"
     },
     "profile": {

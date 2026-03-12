@@ -24,7 +24,7 @@ import { formatDate, renderIcon } from '@/utils'
 import { useCRUD } from '@/composables'
 import api from '@/api'
 
-defineOptions({ name: '菜单管理' })
+defineOptions({ name: '导航菜单' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -47,7 +47,7 @@ const {
   modalForm,
   modalFormRef,
 } = useCRUD({
-  name: '菜单',
+  name: '导航',
   initForm,
   doCreate: api.createMenu,
   doDelete: api.deleteMenu,
@@ -66,9 +66,9 @@ const menuOptions = ref([])
 
 const columns = [
   { title: 'ID', key: 'id', width: 50, ellipsis: { tooltip: true }, align: 'center' },
-  { title: '菜单名称', key: 'name', width: 80, ellipsis: { tooltip: true }, align: 'center' },
+  { title: '导航名称', key: 'name', width: 80, ellipsis: { tooltip: true }, align: 'center' },
   {
-    title: '菜单类型',
+    title: '导航类型',
     key: 'menu_type',
     width: 80,
     align: 'center',
@@ -86,7 +86,7 @@ const columns = [
       return h(
         NTag,
         { type: 'primary', round: round, bordered: bordered },
-        { default: () => (row.menu_type === 'catalog' ? '目录' : '菜单') }
+        { default: () => (row.menu_type === 'catalog' ? '目录' : '页面') }
       )
     },
   },
@@ -104,7 +104,7 @@ const columns = [
   { title: '跳转路径', key: 'redirect', width: 80, ellipsis: { tooltip: true }, align: 'center' },
   { title: '组件路径', key: 'component', width: 80, ellipsis: { tooltip: true }, align: 'center' },
   {
-    title: '保活',
+    title: '缓存',
     key: 'keepalive',
     width: 40,
     align: 'center',
@@ -118,7 +118,7 @@ const columns = [
     },
   },
   {
-    title: '隐藏',
+    title: '侧栏隐藏',
     key: 'is_hidden',
     width: 40,
     align: 'center',
@@ -209,7 +209,7 @@ const columns = [
                 ),
                 [[vPermission, 'delete/api/v1/menu/delete']]
               ),
-            default: () => h('div', {}, '确定删除该菜单吗?'),
+            default: () => h('div', {}, '确认删除这条导航吗？'),
           }
         ),
       ]
@@ -249,7 +249,7 @@ function handleClickAdd() {
 
 async function getTreeSelect() {
   const { data } = await api.getMenus()
-  const menu = { id: 0, name: '根目录', children: [] }
+  const menu = { id: 0, name: '导航根节点', children: [] }
   menu.children = data
   menuOptions.value = [menu]
 }
@@ -257,10 +257,10 @@ async function getTreeSelect() {
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage show-footer title="菜单列表">
+  <CommonPage show-footer title="后台导航">
     <template #action>
       <NButton v-permission="'post/api/v1/menu/create'" type="primary" @click="handleClickAdd">
-        <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建根菜单
+        <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新增一级导航
       </NButton>
     </template>
 
@@ -290,13 +290,13 @@ async function getTreeSelect() {
         :label-width="80"
         :model="modalForm"
       >
-        <NFormItem label="菜单类型" path="menu_type">
+        <NFormItem label="导航类型" path="menu_type">
           <NRadioGroup v-model:value="modalForm.menu_type">
             <NRadio label="目录" value="catalog" />
-            <NRadio label="菜单" value="menu" />
+            <NRadio label="页面" value="menu" />
           </NRadioGroup>
         </NFormItem>
-        <NFormItem label="上级菜单" path="parent_id">
+        <NFormItem label="上级导航" path="parent_id">
           <NTreeSelect
             v-model:value="modalForm.parent_id"
             key-field="id"
@@ -306,15 +306,15 @@ async function getTreeSelect() {
           />
         </NFormItem>
         <NFormItem
-          label="菜单名称"
+          label="导航名称"
           path="name"
           :rule="{
             required: true,
-            message: '请输入唯一菜单名称',
+            message: '请输入唯一导航名称',
             trigger: ['input', 'blur'],
           }"
         >
-          <NInput v-model:value="modalForm.name" placeholder="请输入唯一菜单名称" />
+          <NInput v-model:value="modalForm.name" placeholder="请输入唯一导航名称" />
         </NFormItem>
         <NFormItem
           label="访问路径"
@@ -330,7 +330,7 @@ async function getTreeSelect() {
         <NFormItem v-if="modalForm.menu_type === 'menu'" label="组件路径" path="component">
           <NInput
             v-model:value="modalForm.component"
-            placeholder="请输入组件路径，例如：/system/user"
+            placeholder="请输入组件路径，例如：/interview-admin/candidate"
           />
         </NFormItem>
         <NFormItem label="跳转路径" path="redirect">
@@ -338,20 +338,20 @@ async function getTreeSelect() {
             v-model:value="modalForm.redirect"
             :disabled="modalForm.parent_id !== 0"
             :placeholder="
-              modalForm.parent_id !== 0 ? '只有一级菜单可以设置跳转路径' : '请输入跳转路径'
+              modalForm.parent_id !== 0 ? '只有一级导航可以设置跳转路径' : '请输入跳转路径'
             "
           />
         </NFormItem>
-        <NFormItem label="菜单图标" path="icon">
+        <NFormItem label="导航图标" path="icon">
           <IconPicker v-model:value="modalForm.icon" />
         </NFormItem>
-        <NFormItem label="显示排序" path="order">
+        <NFormItem label="显示顺序" path="order">
           <NInputNumber v-model:value="modalForm.order" :min="1" />
         </NFormItem>
-        <NFormItem label="是否隐藏" path="is_hidden">
+        <NFormItem label="是否在侧栏隐藏" path="is_hidden">
           <NSwitch v-model:value="modalForm.is_hidden" />
         </NFormItem>
-        <NFormItem label="KeepAlive" path="keepalive">
+        <NFormItem label="页面缓存" path="keepalive">
           <NSwitch v-model:value="modalForm.keepalive" />
         </NFormItem>
       </NForm>

@@ -13,7 +13,7 @@ import { useCRUD } from '@/composables'
 // import { loginTypeMap, loginTypeOptions } from '@/constant/data'
 import api from '@/api'
 
-defineOptions({ name: '部门管理' })
+defineOptions({ name: '组织部门' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -30,7 +30,7 @@ const {
   handleDelete,
   handleAdd,
 } = useCRUD({
-  name: 'API',
+  name: '部门',
   initForm: { order: 0 },
   doCreate: api.createDept,
   doUpdate: api.updateDept,
@@ -131,7 +131,7 @@ const columns = [
                 ),
                 [[vPermission, 'delete/api/v1/dept/delete']]
               ),
-            default: () => h('div', {}, '确定删除该部门吗?'),
+            default: () => h('div', {}, '确认删除该部门吗？'),
           }
         ),
       ]
@@ -142,7 +142,7 @@ const columns = [
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage show-footer title="部门列表">
+  <CommonPage show-footer title="组织部门">
     <template #action>
       <div>
         <NButton
@@ -151,7 +151,7 @@ const columns = [
           type="primary"
           @click="addDepts"
         >
-          <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建部门
+          <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新增部门
         </NButton>
       </div>
     </template>
@@ -168,7 +168,7 @@ const columns = [
             v-model:value="queryItems.name"
             clearable
             type="text"
-            placeholder="请输入部门名称"
+            placeholder="按部门名称检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
@@ -190,13 +190,13 @@ const columns = [
         :model="modalForm"
         :rules="deptRules"
       >
-        <NFormItem label="父级部门" path="parent_id">
+        <NFormItem label="上级部门" path="parent_id">
           <NTreeSelect
             v-model:value="modalForm.parent_id"
             :options="deptOption"
             key-field="id"
             label-field="name"
-            placeholder="请选择父级部门"
+            placeholder="请选择上级部门"
             clearable
             default-expand-all
             :disabled="isDisabled"
@@ -205,10 +205,10 @@ const columns = [
         <NFormItem label="部门名称" path="name">
           <NInput v-model:value="modalForm.name" clearable placeholder="请输入部门名称" />
         </NFormItem>
-        <NFormItem label="备注" path="desc">
+        <NFormItem label="补充说明" path="desc">
           <NInput v-model:value="modalForm.desc" type="textarea" clearable />
         </NFormItem>
-        <NFormItem label="排序" path="order">
+        <NFormItem label="显示顺序" path="order">
           <NInputNumber v-model:value="modalForm.order" min="0"></NInputNumber>
         </NFormItem>
       </NForm>

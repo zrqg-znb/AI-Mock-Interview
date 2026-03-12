@@ -95,7 +95,11 @@ async function handleUserAction(key) {
   --portal-subtle: #7a6b60;
   --portal-accent: #b46d4e;
   --portal-accent-soft: #f0e2d7;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
   color: var(--portal-text);
   font-family: 'Avenir Next', 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
   background: radial-gradient(circle at top left, rgba(241, 229, 217, 0.85), transparent 30%),
@@ -103,6 +107,7 @@ async function handleUserAction(key) {
 }
 
 .portal-header {
+  flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -222,7 +227,15 @@ async function handleUserAction(key) {
 }
 
 .portal-main {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  height: 0;
   padding: 18px 28px 40px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .portal-page {

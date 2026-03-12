@@ -9,7 +9,7 @@ import CrudTable from '@/components/table/CrudTable.vue'
 
 import api from '@/api'
 
-defineOptions({ name: '审计日志' })
+defineOptions({ name: '操作日志' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -81,31 +81,31 @@ const methodOptions = [
 
 function formatJSON(data) {
   try {
-    return typeof data === 'string' 
+    return typeof data === 'string'
       ? JSON.stringify(JSON.parse(data), null, 2)
       : JSON.stringify(data, null, 2)
   } catch (e) {
-    return data || '无数据'
+    return data || '暂无内容'
   }
 }
 
 const columns = [
   {
-    title: '用户名称',
+    title: '操作账号',
     key: 'username',
     width: 'auto',
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: '接口概要',
+    title: '接口说明',
     key: 'summary',
     align: 'center',
     width: 'auto',
     ellipsis: { tooltip: true },
   },
   {
-    title: '功能模块',
+    title: '业务模块',
     key: 'module',
     align: 'center',
     width: 'auto',
@@ -133,7 +133,7 @@ const columns = [
     ellipsis: { tooltip: true },
   },
   {
-    title: '请求体',
+    title: '请求参数',
     key: 'request_body',
     align: 'center',
     width: 80,
@@ -161,7 +161,7 @@ const columns = [
     },
   },
   {
-    title: '响应体',
+    title: '响应内容',
     key: 'response_body',
     align: 'center',
     width: 80,
@@ -196,7 +196,7 @@ const columns = [
     ellipsis: { tooltip: true },
   },
   {
-    title: '操作时间',
+    title: '记录时间',
     key: 'created_at',
     align: 'center',
     width: 'auto',
@@ -207,7 +207,7 @@ const columns = [
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage>
+  <CommonPage title="后台操作日志">
     <!-- 表格 -->
     <CrudTable
       ref="$table"
@@ -216,30 +216,30 @@ const columns = [
       :get-data="api.getAuditLogList"
     >
       <template #queryBar>
-        <QueryBarItem label="用户名称" :label-width="70">
+        <QueryBarItem label="操作账号" :label-width="70">
           <NInput
             v-model:value="queryItems.username"
             clearable
             type="text"
-            placeholder="请输入用户名称"
+            placeholder="按账号名称检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="功能模块" :label-width="70">
+        <QueryBarItem label="业务模块" :label-width="70">
           <NInput
             v-model:value="queryItems.module"
             clearable
             type="text"
-            placeholder="请输入功能模块"
+            placeholder="按模块名称检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="接口概要" :label-width="70">
+        <QueryBarItem label="接口说明" :label-width="70">
           <NInput
             v-model:value="queryItems.summary"
             clearable
             type="text"
-            placeholder="请输入接口概要"
+            placeholder="按接口说明检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
@@ -249,7 +249,7 @@ const columns = [
             style="width: 180px"
             :options="methodOptions"
             clearable
-            placeholder="请选择请求方法"
+            placeholder="请选择请求方式"
           />
         </QueryBarItem>
         <QueryBarItem label="请求路径" :label-width="70">
@@ -257,7 +257,7 @@ const columns = [
             v-model:value="queryItems.path"
             clearable
             type="text"
-            placeholder="请输入请求路径"
+            placeholder="按请求路径检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
@@ -266,16 +266,16 @@ const columns = [
             v-model:value="queryItems.status"
             clearable
             type="text"
-            placeholder="请输入状态码"
+            placeholder="按状态码检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="操作时间" :label-width="70">
+        <QueryBarItem label="记录时间" :label-width="70">
           <NDatePicker
             v-model:value="datetimeRange"
             type="datetimerange"
             clearable
-            placeholder="请选择时间范围"
+            placeholder="请选择操作时间"
             @update:value="handleDateRangeChange"
           />
         </QueryBarItem>

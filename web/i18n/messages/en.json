@@ -1,6 +1,6 @@
 {
   "lang": "English",
-  "app_name": "Vue FastAPI Admin",
+  "app_name": "AI Mock Interview System",
   "header": {
     "label_profile": "Profile",
     "label_logout": "Logout",
@@ -11,18 +11,23 @@
   "views": {
     "login": {
       "text_login": "Login",
-      "message_input_username_password": "Please enter username and password",
-      "message_verifying": "Verifying...",
-      "message_login_success": "Login successful"
+      "message_input_username_password": "Please enter your account and password",
+      "message_verifying": "Verifying sign-in information...",
+      "message_login_success": "Login successful, redirecting to dashboard",
+      "text_portal": "Operations Sign In",
+      "text_subtitle": "Access the AI Mock Interview System to manage permissions, business data, interview flow, and archived reports.",
+      "text_hint": "Candidate accounts are provisioned from the admin side and land on the operations dashboard after sign-in.",
+      "placeholder_username": "Enter your account",
+      "placeholder_password": "Enter your password"
     },
     "workbench": {
       "label_workbench": "Workbench",
-      "text_hello": "hello, {username}",
-      "text_welcome": "Today is another day full of energy!",
-      "label_number_of_items": "Number of items",
-      "label_upcoming": "Upcoming",
-      "label_information": "Information",
-      "label_project": "Project",
+      "text_hello": "Hello, {username}",
+      "text_welcome": "View operations, interview flow, and AI service availability in one place.",
+      "label_number_of_items": "Candidates",
+      "label_upcoming": "Running Sessions",
+      "label_information": "Reports",
+      "label_project": "Quick Access",
       "label_more": "More"
     },
     "profile": {

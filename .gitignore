@@ -1,0 +1,24 @@
+# local environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# logs and runtime files
+app/logs/
+
+# frontend build
+web/dist/
+web/node_modules/
+
+# editor
+.idea/
+.DS_Store

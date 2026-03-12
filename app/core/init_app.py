@@ -89,7 +89,7 @@ async def upsert_menu(**payload):
 async def init_menus():
     system_menu = await upsert_menu(
         menu_type=MenuType.CATALOG,
-        name="系统管理",
+        name="系统设置",
         path="/system",
         order=1,
         parent_id=0,
@@ -102,7 +102,7 @@ async def init_menus():
     system_children = [
         dict(
             menu_type=MenuType.MENU,
-            name="用户管理",
+            name="账号管理",
             path="user",
             order=1,
             parent_id=system_menu.id,
@@ -114,7 +114,7 @@ async def init_menus():
         ),
         dict(
             menu_type=MenuType.MENU,
-            name="角色管理",
+            name="权限角色",
             path="role",
             order=2,
             parent_id=system_menu.id,
@@ -126,7 +126,7 @@ async def init_menus():
         ),
         dict(
             menu_type=MenuType.MENU,
-            name="菜单管理",
+            name="导航菜单",
             path="menu",
             order=3,
             parent_id=system_menu.id,
@@ -138,7 +138,7 @@ async def init_menus():
         ),
         dict(
             menu_type=MenuType.MENU,
-            name="API管理",
+            name="接口台账",
             path="api",
             order=4,
             parent_id=system_menu.id,
@@ -150,7 +150,7 @@ async def init_menus():
         ),
         dict(
             menu_type=MenuType.MENU,
-            name="部门管理",
+            name="组织部门",
             path="dept",
             order=5,
             parent_id=system_menu.id,
@@ -162,7 +162,7 @@ async def init_menus():
         ),
         dict(
             menu_type=MenuType.MENU,
-            name="审计日志",
+            name="操作日志",
             path="auditlog",
             order=6,
             parent_id=system_menu.id,
@@ -178,7 +178,7 @@ async def init_menus():
 
     await upsert_menu(
         menu_type=MenuType.MENU,
-        name="一级菜单",
+        name="扩展入口",
         path="/top-menu",
         order=2,
         parent_id=0,
@@ -259,6 +259,18 @@ async def init_menus():
             icon="solar:chart-square-bold-duotone",
             is_hidden=False,
             component="/interview-admin/report",
+            keepalive=False,
+            redirect="",
+        ),
+        dict(
+            menu_type=MenuType.MENU,
+            name="AI运行状态",
+            path="ai-runtime",
+            order=6,
+            parent_id=interview_menu.id,
+            icon="solar:settings-bold-duotone",
+            is_hidden=False,
+            component="/interview-admin/ai-runtime",
             keepalive=False,
             redirect="",
         ),

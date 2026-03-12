@@ -85,6 +85,7 @@
               v-model:value="modalForm.session_id"
               filterable
               :options="sessionOptions"
+              placeholder="请选择场次"
               @update:value="handleSessionChange"
             />
           </n-form-item-gi>
@@ -101,10 +102,16 @@
               v-model:value="modalForm.candidate_id"
               filterable
               :options="candidateOptions"
+              placeholder="请选择候选人"
             />
           </n-form-item-gi>
           <n-form-item-gi label="岗位" path="position_id">
-            <n-select v-model:value="modalForm.position_id" filterable :options="positionOptions" />
+            <n-select
+              v-model:value="modalForm.position_id"
+              filterable
+              :options="positionOptions"
+              placeholder="请选择岗位"
+            />
           </n-form-item-gi>
           <n-form-item-gi label="归档状态" path="archive_status">
             <n-select v-model:value="modalForm.archive_status" :options="archiveStatusOptions" />
@@ -112,22 +119,22 @@
           <n-form-item-gi label="PDF 地址" path="pdf_url">
             <n-input
               v-model:value="modalForm.pdf_url"
-              placeholder="可留空，候选人端支持直接浏览器打印导出"
+              placeholder="可留空，导出时可在浏览器打印为 PDF"
             />
           </n-form-item-gi>
           <n-form-item-gi label="亮点" path="highlights" span="2">
-            <n-input v-model:value="modalForm.highlights" placeholder="多条用中文逗号分隔" />
+            <n-input v-model:value="modalForm.highlights" placeholder="多个内容请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="风险点" path="risks" span="2">
-            <n-input v-model:value="modalForm.risks" placeholder="多条用中文逗号分隔" />
+            <n-input v-model:value="modalForm.risks" placeholder="多个内容请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="改进建议" path="suggestions" span="2">
-            <n-input v-model:value="modalForm.suggestions" placeholder="多条用中文逗号分隔" />
+            <n-input v-model:value="modalForm.suggestions" placeholder="多个内容请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="推荐岗位" path="recommended_positions" span="2">
             <n-input
               v-model:value="modalForm.recommended_positions"
-              placeholder="多条用中文逗号分隔"
+              placeholder="多个内容请用中文逗号分隔"
             />
           </n-form-item-gi>
           <n-form-item-gi label="综合评价" path="overview" span="2">
@@ -135,6 +142,7 @@
               v-model:value="modalForm.overview"
               type="textarea"
               :autosize="{ minRows: 5, maxRows: 7 }"
+              placeholder="请输入综合评价"
             />
           </n-form-item-gi>
         </n-grid>

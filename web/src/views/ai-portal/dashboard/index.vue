@@ -8,7 +8,7 @@
             把准备工作做扎实，再按真实面试的节奏练一遍。
           </h1>
           <p class="portal-section-subtitle" style="max-width: 680px">
-            这里更像一个陪你准备求职的练习空间：先完善简历，再挑岗位，最后进入面试房间和回看报告。页面尽量克制，重点放在流程是否顺手。
+            这里像一个求职准备台：先完善简历，再挑岗位，最后进入练习房间和回看报告。重点放在信息是否清楚、流程是否顺手。
           </p>
           <n-space style="margin-top: 18px">
             <n-button type="primary" size="large" @click="router.push('/ai-interview/positions')"
@@ -56,7 +56,7 @@
     </div>
 
     <n-alert v-if="!dashboard.profile_ready" type="warning" style="border-radius: 20px">
-      你的候选人档案还不够完整。建议先补齐目标岗位、技能标签和项目经历，再开始练习，得到的岗位推荐和报告会更贴近真实情况。
+      你的候选人档案还不够完整。建议先补齐目标岗位、技能标签和项目经历，再开始练习，这样岗位推荐和练习总结会更贴近真实求职场景。
     </n-alert>
 
     <div class="portal-grid cols-2">
@@ -65,7 +65,7 @@
           <div>
             <h2 class="portal-section-title">适合先练的岗位</h2>
             <p class="portal-section-subtitle">
-              根据当前简历信息整理出的推荐岗位，方便你快速进入状态。
+              根据当前简历信息整理出的练习入口，方便你先从更有把握的岗位开始。
             </p>
           </div>
           <n-button text type="primary" @click="router.push('/ai-interview/positions')"
@@ -111,7 +111,9 @@
         <div class="portal-row" style="align-items: flex-start">
           <div>
             <h2 class="portal-section-title">最近一次练习报告</h2>
-            <p class="portal-section-subtitle">练习结束后会自动生成一份结构化总结，方便你回看。</p>
+            <p class="portal-section-subtitle">
+              练习结束后会整理成一页总结，方便你回看和准备下一次。
+            </p>
           </div>
           <n-button v-if="dashboard.latest_report" text type="primary" @click="openLatestReport"
             >打开详情</n-button
@@ -161,7 +163,7 @@
 
         <n-empty
           v-else
-          description="还没有练习报告，先去完成一场模拟面试吧。"
+          description="还没有练习记录，先去完成一次面试练习吧。"
           style="margin-top: 36px"
         >
           <template #extra>

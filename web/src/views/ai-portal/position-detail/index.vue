@@ -12,13 +12,15 @@
             {{ detail.level || '常规职级' }}
           </p>
           <p class="portal-section-subtitle" style="margin-top: 16px">
-            {{ detail.summary || '你可以先通读岗位要求，再决定是否把它作为下一场练习的目标。' }}
+            {{ detail.summary || '你可以先看完岗位要求，再决定是否把它作为下一场练习的目标。' }}
           </p>
           <n-space style="margin-top: 18px">
             <n-button tertiary @click="router.push('/ai-interview/positions')"
               >返回岗位列表</n-button
             >
-            <n-button type="primary" size="large" @click="startInterview">开始这场练习</n-button>
+            <n-button type="primary" size="large" :loading="starting" @click="startInterview"
+              >开始这场练习</n-button
+            >
           </n-space>
         </div>
 
@@ -33,8 +35,8 @@
 
     <div class="portal-grid cols-2">
       <div class="portal-card">
-        <h2 class="portal-section-title">为什么推荐这个岗位</h2>
-        <p class="portal-section-subtitle">先看整体匹配，再判断要不要立刻开始练习。</p>
+        <h2 class="portal-section-title">为什么适合先练这个岗位</h2>
+        <p class="portal-section-subtitle">先看整体匹配，再决定要不要现在开始练。</p>
         <div class="portal-grid cols-3" style="margin-top: 20px">
           <div
             v-for="metric in detail.heat_map || []"
@@ -129,7 +131,11 @@
           <li>系统先给出一组问题，再根据你的回答逐步继续下一题。</li>
           <li>练习结束后会生成一份便于回看的总结报告。</li>
         </ul>
-        <n-button type="primary" style="margin-top: 18px" @click="startInterview"
+        <n-button
+          type="primary"
+          style="margin-top: 18px"
+          :loading="starting"
+          @click="startInterview"
           >就从这个岗位开始</n-button
         >
       </div>
@@ -143,6 +149,7 @@ import api from '@/api'
 const router = useRouter()
 const route = useRoute()
 const detail = ref({})
+const starting = ref(false)
 
 onMounted(loadDetail)
 
@@ -152,9 +159,15 @@ async function loadDetail() {
 }
 
 async function startInterview() {
-  const res = await api.startMockInterview({ position_id: detail.value.id, total_rounds: 5 })
-  const session = res.data
-  window.sessionStorage.setItem(`mock-session:${session.id}`, JSON.stringify(session))
-  router.push(`/ai-interview/room/${session.id}`)
+  if (!detail.value.id || starting.value) return
+  starting.value = true
+  try {
+    const res = await api.startMockInterview({ position_id: detail.value.id, total_rounds: 5 })
+    const session = res.data
+    window.sessionStorage.setItem(`mock-session:${session.id}`, JSON.stringify(session))
+    router.push(`/ai-interview/room/${session.id}`)
+  } finally {
+    starting.value = false
+  }
 }
 </script>

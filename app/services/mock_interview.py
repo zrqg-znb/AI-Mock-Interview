@@ -1,4 +1,4 @@
-import math
+import json
 import re
 from datetime import datetime
 from typing import Any
@@ -63,6 +63,89 @@ class MockInterviewService:
         )
         return base_terms, must_have, bonus
 
+    @staticmethod
+    def _json_dump(data: Any) -> str:
+        try:
+            return json.dumps(data, ensure_ascii=False)
+        except TypeError:
+            return str(data)
+
+    @staticmethod
+    def _safe_text(value: Any, default: str = "") -> str:
+        if value is None:
+            return default
+        text = str(value).strip()
+        return text or default
+
+    @staticmethod
+    def _normalize_string_list(value: Any, limit: int = 5) -> list[str]:
+        if not value:
+            return []
+        if isinstance(value, str):
+            raw_items = re.split(r"[，,、\n]", value)
+        elif isinstance(value, list):
+            raw_items = value
+        else:
+            return []
+        items: list[str] = []
+        seen: set[str] = set()
+        for item in raw_items:
+            text = str(item).strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            items.append(text)
+            if len(items) >= limit:
+                break
+        return items
+
+    def _normalize_evaluation_focus(self, value: Any, fallback: list[str]) -> list[str]:
+        result = self._normalize_string_list(value, limit=6)
+        return result or fallback
+
+    def _normalize_question_plan(self, questions: Any, fallback_questions: list[dict], total_rounds: int) -> list[dict[str, Any]]:
+        raw_questions = questions if isinstance(questions, list) else []
+        normalized: list[dict[str, Any]] = []
+        for index in range(total_rounds):
+            fallback = fallback_questions[index] if index < len(fallback_questions) else {
+                "index": index + 1,
+                "stage": "experience",
+                "focus": "岗位匹配",
+                "question": "请结合经历继续展开说明。",
+            }
+            source = raw_questions[index] if index < len(raw_questions) and isinstance(raw_questions[index], dict) else {}
+            item = {
+                "index": index + 1,
+                "stage": self._safe_text(source.get("stage"), fallback.get("stage", "experience")),
+                "focus": self._safe_text(source.get("focus"), fallback.get("focus", "岗位匹配")),
+                "question": self._safe_text(source.get("question"), fallback.get("question", "请结合经历继续展开说明。")),
+            }
+            expected_points = self._normalize_string_list(source.get("expected_points"), limit=4)
+            if expected_points:
+                item["expected_points"] = expected_points
+            normalized.append(item)
+        return normalized
+
+    def _normalize_dimension_scores(
+        self,
+        value: Any,
+        dimension_names: list[str],
+        fallback: dict[str, int],
+    ) -> dict[str, int]:
+        if not isinstance(value, dict):
+            return fallback
+        normalized: dict[str, int] = {}
+        has_named_keys = any(name in value for name in dimension_names)
+        ordered_values = list(value.values())
+        for index, name in enumerate(dimension_names):
+            raw = value.get(name) if has_named_keys else ordered_values[index] if index < len(ordered_values) else fallback.get(name, 0)
+            try:
+                score = int(round(float(raw)))
+            except (TypeError, ValueError):
+                score = fallback.get(name, 0)
+            normalized[name] = max(0, min(100, score))
+        return normalized
+
     def build_recommendation_reason(self, candidate: dict, position: dict, matched_tags: list[str], missing_tags: list[str], score: int):
         headline = candidate.get("headline") or candidate.get("target_position") or "候选人"
         matched_text = "、".join(matched_tags[:3]) or "你的核心经历"
@@ -70,7 +153,7 @@ class MockInterviewService:
         return (
             f"{headline} 与 {position.get('title')} 的匹配度为 {score} 分，"
             f"当前命中的核心点包括 {matched_text}。"
-            f"建议在正式模拟前补强 {missing_text}，可明显提高面试报告中的岗位匹配与表达完整度。"
+            f"建议在正式面试前补强 {missing_text}，可明显提高面试报告中的岗位匹配与表达完整度。"
         )
 
     def calculate_position_score(self, candidate: dict, position: dict, jd: dict | None):
@@ -109,62 +192,87 @@ class MockInterviewService:
                 "index": 1,
                 "stage": "opening",
                 "focus": "自我介绍",
-                "question": f"请用 1 分钟做一个与 {position.get('title')} 高度相关的自我介绍，并突出你最有代表性的项目经历。",
+                "question": f"请先用 1 分钟做一个自我介绍，尽量围绕 {position.get('title')} 相关的经历展开。",
             },
             {
                 "index": 2,
                 "stage": "experience",
                 "focus": focus_tags[0] if focus_tags else "核心项目",
-                "question": f"结合你的简历，详细讲讲你最能体现 {position.get('title')} 胜任力的一次项目实践，你负责了什么、如何推进、结果如何？",
+                "question": f"结合你的简历，详细讲讲一段最能体现你胜任 {position.get('title')} 的项目经历。你做了什么，结果如何？",
             },
             {
                 "index": 3,
                 "stage": "scenario",
                 "focus": focus_tags[1] if len(focus_tags) > 1 else "问题拆解",
-                "question": f"如果你入职后需要在两周内交付一个围绕 {position.get('category') or position.get('title')} 的关键任务，你会如何拆解目标、安排节奏并验证结果？",
+                "question": f"如果你入职后需要在两周内推进一个围绕 {position.get('category') or position.get('title')} 的关键任务，你会怎么拆解目标、安排节奏并判断是否做对了？",
             },
             {
                 "index": 4,
                 "stage": "stress",
-                "focus": focus_tags[2] if len(focus_tags) > 2 else "临场稳定度",
-                "question": f"当项目推进受阻、资源不足且时间紧时，你通常如何沟通风险、争取资源并稳定团队节奏？",
+                "focus": focus_tags[2] if len(focus_tags) > 2 else "沟通与稳定度",
+                "question": "当项目推进受阻、资源不足且时间紧时，你通常会如何沟通风险、争取资源，并保证事情继续往前走？",
             },
             {
                 "index": 5,
                 "stage": "closing",
                 "focus": "岗位动机",
-                "question": f"最后请你总结一下：为什么你适合 {position.get('title')}，以及你接下来 90 天最想交付的成果是什么？",
+                "question": f"最后请你总结一下：为什么你适合 {position.get('title')}，以及入职后的前 90 天你最想交付什么结果？",
             },
         ]
         questions = questions[:total_rounds]
         return {
             "persona": {
-                "name": "Astra 面试官",
-                "style": "冷静、专业、会追问业务细节",
-                "tone": "高级感、数据导向、表达克制",
+                "name": "模拟面试官",
+                "style": "提问清晰，关注经历细节",
+                "tone": "专业、直接、尊重候选人",
             },
             "evaluation_focus": scoring_dimensions or DEFAULT_SCORING_DIMENSIONS,
             "questions": questions,
-            "opening": f"你好，我是今天负责 {position.get('title')} 模拟面试的 AI 面试官，我们会围绕岗位胜任力、表达结构与业务理解展开。",
+            "opening": f"你好，今天我们围绕 {position.get('title')} 做一场岗位练习。我会重点关注你的项目经历、岗位理解和表达结构。",
         }
 
     async def build_question_plan(self, candidate: dict, position: dict, jd: dict | None, total_rounds: int):
         fallback = self.build_fallback_question_plan(candidate, position, jd, total_rounds)
         if not interview_ai_adapter.enabled:
             return fallback
-        system_prompt = "你是资深招聘官，请根据岗位JD与简历，生成结构化模拟面试题计划，仅返回 JSON。"
-        user_prompt = (
-            f"岗位：{position}\n候选人：{candidate}\nJD：{jd}\n"
-            f"请返回 persona、evaluation_focus、opening、questions 四个字段，questions 生成 {total_rounds} 题。"
+        system_prompt = (
+            "你是一位资深招聘面试官，请根据岗位信息、JD 和候选人简历，生成一轮真实、克制、像人工面试官的中文模拟面试题计划。"
+            "不要出现 AI、模型、算法、引擎 等表述，只返回 JSON 对象。"
         )
-        result = await interview_ai_adapter.generate_json(system_prompt, user_prompt)
-        if not result or not isinstance(result.get("questions"), list):
+        user_prompt = (
+            "请严格返回如下 JSON 结构："
+            '{"persona":{"name":"...","style":"...","tone":"..."},'
+            '"evaluation_focus":["..."],"opening":"...",'
+            '"questions":[{"index":1,"stage":"opening","focus":"...","question":"...","expected_points":["..."]}]}'
+            f"\n题目数量：{total_rounds}"
+            f"\n岗位信息：{self._json_dump(position)}"
+            f"\n候选人信息：{self._json_dump(candidate)}"
+            f"\nJD 信息：{self._json_dump(jd or {})}"
+            "\n要求：1. 题目要贴近真实招聘场景；2. 每题只问一个核心问题；3. 尽量结合候选人经历和岗位重点生成。"
+        )
+        result = await interview_ai_adapter.generate_json(
+            system_prompt,
+            user_prompt,
+            temperature=0.55,
+            scenario="question_plan",
+            metadata={"position_id": position.get("id"), "total_rounds": total_rounds},
+        )
+        if not result or not isinstance(result, dict):
             return fallback
-        result.setdefault("persona", fallback["persona"])
-        result.setdefault("evaluation_focus", fallback["evaluation_focus"])
-        result.setdefault("opening", fallback["opening"])
-        result["questions"] = result["questions"][:total_rounds]
-        return result
+        persona_raw = result.get("persona") if isinstance(result.get("persona"), dict) else {}
+        questions = self._normalize_question_plan(result.get("questions"), fallback["questions"], total_rounds)
+        if not questions:
+            return fallback
+        return {
+            "persona": {
+                "name": self._safe_text(persona_raw.get("name"), fallback["persona"]["name"]),
+                "style": self._safe_text(persona_raw.get("style"), fallback["persona"]["style"]),
+                "tone": self._safe_text(persona_raw.get("tone"), fallback["persona"]["tone"]),
+            },
+            "evaluation_focus": self._normalize_evaluation_focus(result.get("evaluation_focus"), fallback["evaluation_focus"]),
+            "opening": self._safe_text(result.get("opening"), fallback["opening"]),
+            "questions": questions,
+        }
 
     def build_live_metrics(self, jd: dict | None, user_turns: list[dict]):
         user_text = " ".join(turn.get("content", "") for turn in user_turns)
@@ -189,19 +297,52 @@ class MockInterviewService:
     async def build_next_question(self, session: dict, position: dict, jd: dict | None, turns: list[dict]):
         plan = session.get("question_plan") or []
         next_index = session.get("current_round", 0) + 1
-        if next_index > session.get("total_rounds", 5):
+        total_rounds = session.get("total_rounds", 5)
+        if next_index > total_rounds:
             return {"completed": True}
         if isinstance(plan, list) and len(plan) >= next_index:
             question_item = plan[next_index - 1]
         else:
-            fallback_plan = self.build_fallback_question_plan({}, position, jd, session.get("total_rounds", 5))
+            fallback_plan = self.build_fallback_question_plan({}, position, jd, total_rounds)
             question_item = fallback_plan["questions"][next_index - 1]
-        return {
+        fallback_result = {
             "completed": False,
             "round_no": next_index,
             "question": question_item.get("question"),
             "focus": question_item.get("focus"),
             "stage": question_item.get("stage"),
+        }
+        if not interview_ai_adapter.enabled:
+            return fallback_result
+        system_prompt = (
+            "你是一位真实招聘场景中的面试官。请基于已给出的面试计划和已有对话，为下一轮生成一个自然、克制、聚焦的中文问题。"
+            "不要出现 AI、模型、算法 等字样，只返回 JSON 对象。"
+        )
+        user_prompt = (
+            '请返回 JSON：{"question":"...","focus":"...","stage":"..."}'
+            f"\n当前轮次：{next_index}/{total_rounds}"
+            f"\n岗位信息：{self._json_dump(position)}"
+            f"\nJD 信息：{self._json_dump(jd or {})}"
+            f"\n面试计划：{self._json_dump(plan)}"
+            f"\n建议方向：{self._json_dump(question_item)}"
+            f"\n最近对话：{self._json_dump(turns[-8:])}"
+            "\n要求：1. 问题只保留一个核心问题；2. 尽量承接候选人刚才的回答；3. 题目长度控制在 80 字以内。"
+        )
+        ai_result = await interview_ai_adapter.generate_json(
+            system_prompt,
+            user_prompt,
+            temperature=0.5,
+            scenario="next_question",
+            metadata={"position_id": position.get("id"), "round_no": next_index},
+        )
+        if not ai_result or not isinstance(ai_result, dict):
+            return fallback_result
+        return {
+            "completed": False,
+            "round_no": next_index,
+            "question": self._safe_text(ai_result.get("question"), fallback_result["question"]),
+            "focus": self._safe_text(ai_result.get("focus"), fallback_result["focus"]),
+            "stage": self._safe_text(ai_result.get("stage"), fallback_result["stage"]),
         }
 
     async def build_report(self, session: dict, candidate: dict, position: dict, jd: dict | None, turns: list[dict]):
@@ -215,35 +356,34 @@ class MockInterviewService:
             min(98, live_metrics["keyword_hit_rate"] + 8),
             live_metrics["communication_stability"],
         ]
-        dimension_scores = {}
+        dimension_scores: dict[str, int] = {}
         for index, name in enumerate(dimension_names):
             dimension_scores[name] = values_seed[index % len(values_seed)]
         total_score = round(sum(dimension_scores.values()) / max(len(dimension_scores), 1))
         matched_keywords = live_metrics.get("matched_keywords", [])
         highlights = [
-            f"回答中较多命中了 {position.get('title')} 所需的业务关键词。",
-            "表达节奏稳定，能维持连续作答。",
-            "项目叙述具备一定结果导向意识。",
+            f"在 {position.get('title')} 相关问题上能较快进入主题。",
+            "回答节奏比较稳定，能够连续表达主要观点。",
+            "项目叙述中体现出一定的结果意识。",
         ]
         if matched_keywords:
-            highlights[0] = f"回答中命中了 {', '.join(matched_keywords[:3])} 等岗位关键词。"
+            highlights[0] = f"回答中提到了 {', '.join(matched_keywords[:3])} 等岗位关键词。"
         risks = [
-            "高压场景回答还可以进一步量化结果。",
-            "部分回答的结构化程度可以继续加强。",
-            "若补充更具体的数据指标，报告说服力会更高。",
+            "部分回答还可以补充更具体的数据或结果。",
+            "复杂情景题的拆解顺序可以再清晰一些。",
+            "少数表述偏概括，建议补上关键动作和判断依据。",
         ]
         suggestions = [
-            "下一轮训练建议优先补强 STAR 结构表达。",
-            f"针对 {position.get('title')} 的关键能力，准备 2 个可量化项目案例。",
-            "在结尾主动总结业务价值与落地结果，提升高级感。",
+            "下次练习优先用 STAR 结构整理 2 个核心项目案例。",
+            f"围绕 {position.get('title')} 再准备 1 到 2 个可量化成果，回答会更有说服力。",
+            "结尾可以主动总结业务结果和个人贡献，让回答更完整。",
         ]
         recommended_positions = [position.get("title")]
         if position.get("category") and position.get("category") != position.get("title"):
             recommended_positions.append(position.get("category"))
         overview = (
-            f"本次模拟面试整体表现为 {total_score} 分。候选人在 {position.get('title')} 相关问题上展示了较好的岗位理解，"
-            f"其中关键词命中率为 {live_metrics['keyword_hit_rate']}%，表达完整度为 {live_metrics['completeness']}%。"
-            "若能进一步补强案例量化与压力场景拆解，正式面试通过率会更高。"
+            f"这次 {position.get('title')} 练习总体得分 {total_score} 分。候选人在岗位关键词覆盖、表达完整度和沟通稳定性方面表现较稳。"
+            "如果能补充更具体的数据结果，并在情景题里把判断过程讲清楚，整体表现还会更进一步。"
         )
         payload = {
             "total_score": total_score,
@@ -259,14 +399,62 @@ class MockInterviewService:
                 "persona": session.get("ai_persona", {}),
                 "question_plan": session.get("question_plan", []),
                 "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "ai_model": interview_ai_adapter.model_name if interview_ai_adapter.enabled else "",
+                "ai_generated": False,
             },
         }
         if interview_ai_adapter.enabled:
-            system_prompt = "你是资深面试官，请根据面试对话生成结构化面试报告，仅返回 JSON。"
-            user_prompt = f"场次：{session}\n候选人：{candidate}\n岗位：{position}\nJD：{jd}\n对话：{turns}"
-            ai_result = await interview_ai_adapter.generate_json(system_prompt, user_prompt)
+            system_prompt = (
+                "你是一位资深招聘面试官，请基于岗位信息、简历和面试对话，生成一份真实、克制、可落地的中文面试复盘。"
+                "不要出现 AI、模型、算法 等表述，不要编造未出现的经历，只返回 JSON 对象。"
+            )
+            user_prompt = (
+                '请严格返回 JSON：'
+                '{"total_score":80,"dimension_scores":{"专业能力":80},"overview":"...",'
+                '"highlights":["..."],"risks":["..."],"suggestions":["..."],"recommended_positions":["..."]}'
+                f"\n评分维度请使用：{self._json_dump(dimension_names)}"
+                f"\n场次信息：{self._json_dump(session)}"
+                f"\n候选人信息：{self._json_dump(candidate)}"
+                f"\n岗位信息：{self._json_dump(position)}"
+                f"\nJD 信息：{self._json_dump(jd or {})}"
+                f"\n面试对话：{self._json_dump(turns)}"
+                f"\n实时指标：{self._json_dump(live_metrics)}"
+                "\n要求：1. 结论要像真实面试复盘；2. 每个列表控制在 3 条以内；3. 建议要具体可执行。"
+            )
+            ai_result = await interview_ai_adapter.generate_json(
+                system_prompt,
+                user_prompt,
+                temperature=0.35,
+                scenario="report_generation",
+                metadata={"session_id": session.get("id"), "position_id": position.get("id")},
+            )
             if ai_result and isinstance(ai_result, dict):
-                payload.update({key: value for key, value in ai_result.items() if key in payload or key == 'dimension_scores'})
+                payload["dimension_scores"] = self._normalize_dimension_scores(
+                    ai_result.get("dimension_scores"),
+                    dimension_names,
+                    payload["dimension_scores"],
+                )
+                ai_total = ai_result.get("total_score")
+                if ai_total is None:
+                    payload["total_score"] = round(
+                        sum(payload["dimension_scores"].values()) / max(len(payload["dimension_scores"]), 1)
+                    )
+                else:
+                    try:
+                        payload["total_score"] = max(0, min(100, int(round(float(ai_total)))))
+                    except (TypeError, ValueError):
+                        payload["total_score"] = round(
+                            sum(payload["dimension_scores"].values()) / max(len(payload["dimension_scores"]), 1)
+                        )
+                payload["overview"] = self._safe_text(ai_result.get("overview"), payload["overview"])
+                payload["highlights"] = self._normalize_string_list(ai_result.get("highlights"), limit=3) or payload["highlights"]
+                payload["risks"] = self._normalize_string_list(ai_result.get("risks"), limit=3) or payload["risks"]
+                payload["suggestions"] = self._normalize_string_list(ai_result.get("suggestions"), limit=3) or payload["suggestions"]
+                payload["recommended_positions"] = (
+                    self._normalize_string_list(ai_result.get("recommended_positions"), limit=3)
+                    or payload["recommended_positions"]
+                )
+                payload["report_payload"]["ai_generated"] = True
         return payload
 
     async def get_dashboard(self, user_id: int):
@@ -377,7 +565,7 @@ class MockInterviewService:
                 "started_at": datetime.now(),
             }
         )
-        opening = plan.get("opening") or "欢迎来到 AI 模拟面试，现在我们开始第一题。"
+        opening = plan.get("opening") or "欢迎来到面试练习，我们先从第一题开始。"
         await interview_controller.add_turn(
             session_id=session.id,
             round_no=1,

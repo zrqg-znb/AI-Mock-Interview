@@ -39,6 +39,9 @@ export default {
   deleteDept: (params = {}) => request.delete('/dept/delete', { params }),
   // auditlog
   getAuditLogList: (params = {}) => request.get('/auditlog/list', { params }),
+  // ai runtime admin
+  getAIRuntimeStatus: (params = {}) => request.get('/ai_runtime/status', { params }),
+  runAIRuntimeCheck: (data = {}) => request.post('/ai_runtime/test', data),
   // candidate admin
   getCandidateList: (params = {}) => request.get('/candidate/list', { params }),
   getCandidateById: (params = {}) => request.get('/candidate/get', { params }),
@@ -77,9 +80,12 @@ export default {
   // recommendation and mock interview
   getJobRecommendList: (params = {}) => request.get('/job_recommend/list', { params }),
   getJobRecommendDetail: (params = {}) => request.get('/job_recommend/detail', { params }),
-  startMockInterview: (data = {}) => request.post('/mock_interview/start', data),
+  startMockInterview: (data = {}) =>
+    request.post('/mock_interview/start', data, { timeout: 45000 }),
   submitMockInterviewSegment: (data = {}) => request.post('/mock_interview/submit_segment', data),
-  nextMockInterviewQuestion: (data = {}) => request.post('/mock_interview/next_question', data),
-  finishMockInterview: (data = {}) => request.post('/mock_interview/finish', data),
+  nextMockInterviewQuestion: (data = {}) =>
+    request.post('/mock_interview/next_question', data, { timeout: 30000 }),
+  finishMockInterview: (data = {}) =>
+    request.post('/mock_interview/finish', data, { timeout: 45000 }),
   getMockInterviewReport: (params = {}) => request.get('/mock_interview/report', { params }),
 }

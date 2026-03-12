@@ -39,7 +39,7 @@ export const basicRoutes = [
         component: () => import('@/views/ai-portal/dashboard/index.vue'),
         name: 'AIInterviewDashboard',
         meta: {
-          title: 'AI 面试舱',
+          title: '面试练习台',
           icon: 'hugeicons:artificial-intelligence-04',
           affix: true,
         },
@@ -116,7 +116,7 @@ export const basicRoutes = [
       },
     ],
     meta: {
-      title: 'AI 面试舱',
+      title: '面试练习台',
       icon: 'hugeicons:artificial-intelligence-04',
       order: 2,
     },
@@ -207,7 +207,7 @@ export const basicRoutes = [
     component: () => import('@/views/login/index.vue'),
     isHidden: true,
     meta: {
-      title: '登录页',
+      title: '系统登录',
     },
   },
 ]

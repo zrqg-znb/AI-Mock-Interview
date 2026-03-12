@@ -13,7 +13,7 @@ import { useCRUD } from '@/composables'
 // import { loginTypeMap, loginTypeOptions } from '@/constant/data'
 import api from '@/api'
 
-defineOptions({ name: 'API管理' })
+defineOptions({ name: '接口台账' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -30,7 +30,7 @@ const {
   handleDelete,
   handleAdd,
 } = useCRUD({
-  name: 'API',
+  name: '接口',
   initForm: {},
   doCreate: api.createApi,
   doUpdate: api.updateApi,
@@ -44,12 +44,12 @@ onMounted(() => {
 
 async function handleRefreshApi() {
   await $dialog.confirm({
-    title: '提示',
+    title: '同步接口',
     type: 'warning',
-    content: '此操作会根据后端 app.routes 进行路由更新，确定继续刷新 API 操作？',
+    content: '将根据后端已注册路由重新同步接口台账，确认继续吗？',
     async confirm() {
       await api.refreshApi()
-      $message.success('刷新完成')
+      $message.success('接口台账已同步')
       $table.value?.handleSearch()
     },
   })
@@ -59,7 +59,7 @@ const addAPIRules = {
   path: [
     {
       required: true,
-      message: '请输入API路径',
+      message: '请输入接口路径',
       trigger: ['input', 'blur', 'change'],
     },
   ],
@@ -73,14 +73,14 @@ const addAPIRules = {
   summary: [
     {
       required: true,
-      message: '请输入API简介',
+      message: '请输入接口说明',
       trigger: ['input', 'blur', 'change'],
     },
   ],
   tags: [
     {
       required: true,
-      message: '请输入Tags',
+      message: '请输入业务标签',
       trigger: ['input', 'blur', 'change'],
     },
   ],
@@ -88,7 +88,7 @@ const addAPIRules = {
 
 const columns = [
   {
-    title: 'API路径',
+    title: '接口路径',
     key: 'path',
     width: 'auto',
     align: 'center',
@@ -102,14 +102,14 @@ const columns = [
     ellipsis: { tooltip: true },
   },
   {
-    title: 'API简介',
+    title: '接口说明',
     key: 'summary',
     width: 'auto',
     align: 'center',
     ellipsis: { tooltip: true },
   },
   {
-    title: 'Tags',
+    title: '业务标签',
     key: 'tags',
     width: 'auto',
     align: 'center',
@@ -165,7 +165,7 @@ const columns = [
                 ),
                 [[vPermission, 'delete/api/v1/api/delete']]
               ),
-            default: () => h('div', {}, '确定删除该API吗?'),
+            default: () => h('div', {}, '确认删除这条接口记录吗？'),
           }
         ),
       ]
@@ -176,7 +176,7 @@ const columns = [
 
 <template>
   <!-- 业务页面 -->
-  <CommonPage show-footer title="API列表">
+  <CommonPage show-footer title="接口权限">
     <template #action>
       <div>
         <NButton
@@ -185,7 +185,7 @@ const columns = [
           type="primary"
           @click="handleAdd"
         >
-          <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建API
+          <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />登记接口
         </NButton>
         <NButton
           v-permission="'post/api/v1/api/refresh'"
@@ -193,7 +193,7 @@ const columns = [
           type="warning"
           @click="handleRefreshApi"
         >
-          <TheIcon icon="material-symbols:refresh" :size="18" class="mr-5" />刷新API
+          <TheIcon icon="material-symbols:refresh" :size="18" class="mr-5" />同步接口
         </NButton>
       </div>
     </template>
@@ -210,25 +210,25 @@ const columns = [
             v-model:value="queryItems.path"
             clearable
             type="text"
-            placeholder="请输入API路径"
+            placeholder="按接口路径检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="API简介" :label-width="70">
+        <QueryBarItem label="接口说明" :label-width="70">
           <NInput
             v-model:value="queryItems.summary"
             clearable
             type="text"
-            placeholder="请输入API简介"
+            placeholder="按接口说明检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
-        <QueryBarItem label="Tags" :label-width="40">
+        <QueryBarItem label="标签" :label-width="40">
           <NInput
             v-model:value="queryItems.tags"
             clearable
             type="text"
-            placeholder="请输入API模块"
+            placeholder="按业务标签检索"
             @keypress.enter="$table?.handleSearch()"
           />
         </QueryBarItem>
@@ -250,17 +250,17 @@ const columns = [
         :model="modalForm"
         :rules="addAPIRules"
       >
-        <NFormItem label="API名称" path="path">
-          <NInput v-model:value="modalForm.path" clearable placeholder="请输入API路径" />
+        <NFormItem label="接口路径" path="path">
+          <NInput v-model:value="modalForm.path" clearable placeholder="请输入接口路径" />
         </NFormItem>
         <NFormItem label="请求方式" path="method">
-          <NInput v-model:value="modalForm.method" clearable placeholder="请输入请求方式" />
+          <NInput v-model:value="modalForm.method" clearable placeholder="请输入请求方式，如 GET" />
         </NFormItem>
-        <NFormItem label="API简介" path="summary">
-          <NInput v-model:value="modalForm.summary" clearable placeholder="请输入API简介" />
+        <NFormItem label="接口说明" path="summary">
+          <NInput v-model:value="modalForm.summary" clearable placeholder="请输入接口说明" />
         </NFormItem>
-        <NFormItem label="Tags" path="tags">
-          <NInput v-model:value="modalForm.tags" clearable placeholder="请输入Tags" />
+        <NFormItem label="业务标签" path="tags">
+          <NInput v-model:value="modalForm.tags" clearable placeholder="请输入业务标签" />
         </NFormItem>
       </NForm>
     </CrudModal>

@@ -10,25 +10,30 @@
       </div>
 
       <div w-320 flex-col px-20 py-35>
+        <p text-center text-12 tracking-3 color="#9a7b61">{{ $t('views.login.text_portal') }}</p>
         <h5 f-c-c text-24 font-normal color="#6a6a6a">
           <icon-custom-logo mr-10 text-50 color-primary />{{ $t('app_name') }}
         </h5>
-        <div mt-30>
+        <p mt-10 text-center text-13 color="#7a6b60" line-height="1.8">
+          {{ $t('views.login.text_subtitle') }}
+        </p>
+
+        <div mt-24>
           <n-input
             v-model:value="loginInfo.username"
             autofocus
             class="h-50 items-center pl-10 text-16"
-            placeholder="admin"
+            :placeholder="$t('views.login.placeholder_username')"
             :maxlength="20"
           />
         </div>
-        <div mt-30>
+        <div mt-18>
           <n-input
             v-model:value="loginInfo.password"
             class="h-50 items-center pl-10 text-16"
             type="password"
             show-password-on="mousedown"
-            placeholder="123456"
+            :placeholder="$t('views.login.placeholder_password')"
             :maxlength="20"
             @keypress.enter="handleLogin"
           />
@@ -47,6 +52,10 @@
             {{ $t('views.login.text_login') }}
           </n-button>
         </div>
+
+        <p mt-14 text-center text-12 color="#8b7d71">
+          {{ $t('views.login.text_hint') }}
+        </p>
       </div>
     </div>
   </AppPage>
@@ -94,7 +103,6 @@ async function handleLogin() {
     await addDynamicRoutes()
     if (query.redirect) {
       const path = query.redirect
-      console.log('path', { path, query })
       Reflect.deleteProperty(query, 'redirect')
       router.push({ path, query })
     } else {

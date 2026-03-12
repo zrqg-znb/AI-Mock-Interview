@@ -1,5 +1,5 @@
 <template>
   <AppPage>
-    <h1>一级菜单</h1>
+    <h1>扩展入口</h1>
   </AppPage>
 </template>

@@ -8,7 +8,7 @@
             把每次练习都留下来
           </h1>
           <p class="portal-section-subtitle" style="max-width: 760px">
-            每次练习结束后，这里都会保留一份结构化总结。你可以回看得分、亮点、薄弱环节，也可以把它当作下一次练习前的准备笔记。
+            每次练习结束后，这里都会保留一页总结。你可以回看得分、亮点和下次准备要点，也可以把它当作下一次练习前的笔记。
           </p>
         </div>
         <n-button type="primary" @click="loadData">刷新列表</n-button>
@@ -63,7 +63,7 @@
 
     <n-empty
       v-if="!reports.length"
-      description="当前还没有练习报告，去完成一场模拟面试吧。"
+      description="当前还没有练习报告，去完成一场面试练习吧。"
       class="portal-card"
     >
       <template #extra>

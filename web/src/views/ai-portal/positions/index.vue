@@ -8,7 +8,7 @@
             先从适合自己的岗位开始练
           </h1>
           <p class="portal-section-subtitle" style="max-width: 760px">
-            这里会根据你的简历、目标岗位和现有经历，整理出一批更适合作为模拟练习入口的岗位。先选一个最顺手的，不必一开始就追求最难的题。
+            这里会结合你的简历、目标方向和已有经历，整理出一批更适合作为练习入口的岗位。先从最接近真实求职目标的开始，不必一上来就选最难的。
           </p>
         </div>
         <div class="portal-actions" style="margin-left: auto">
@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <div class="portal-grid cols-2">
+    <div class="cols-2 portal-grid">
       <div v-for="item in positions" :key="item.id" class="portal-card">
         <div class="portal-row" style="align-items: flex-start">
           <div>
@@ -91,7 +91,7 @@
             </div>
           </div>
           <div style="flex: 1">
-            <p class="portal-kpi__label">面试前建议补一补</p>
+            <p class="portal-kpi__label">开始前建议先准备</p>
             <div class="portal-tag-cloud" style="margin-top: 8px">
               <n-tag
                 v-for="tag in item.missing_tags?.slice(0, 4)"
@@ -101,7 +101,7 @@
                 >{{ tag }}</n-tag
               >
               <span v-if="!item.missing_tags?.length" class="portal-muted"
-                >当前信息已经足够支撑一场练习。</span
+                >当前信息已经足够开始一场练习。</span
               >
             </div>
           </div>
@@ -111,14 +111,19 @@
           <n-button tertiary @click="router.push(`/ai-interview/positions/${item.id}`)"
             >查看详情</n-button
           >
-          <n-button type="primary" @click="startInterview(item.id)">开始练习</n-button>
+          <n-button
+            type="primary"
+            :loading="startingPositionId === item.id"
+            @click="startInterview(item.id)"
+            >开始练习</n-button
+          >
         </div>
       </div>
     </div>
 
     <n-empty
       v-if="!positions.length"
-      description="没有找到合适的岗位，先补全简历中心或换个关键词试试。"
+      description="没有找到合适的岗位，先补全简历信息或换个关键词试试。"
       class="portal-card"
     />
   </section>
@@ -132,6 +137,7 @@ const router = useRouter()
 const keyword = ref('')
 const positions = ref([])
 const loading = ref(false)
+const startingPositionId = ref(null)
 
 onMounted(loadData)
 
@@ -146,6 +152,7 @@ async function loadData() {
 }
 
 async function startInterview(positionId) {
+  startingPositionId.value = positionId
   try {
     const res = await api.startMockInterview({ position_id: positionId, total_rounds: 5 })
     const session = res.data
@@ -153,6 +160,8 @@ async function startInterview(positionId) {
     router.push(`/ai-interview/room/${session.id}`)
   } catch (error) {
     console.error(error)
+  } finally {
+    startingPositionId.value = null
   }
 }
 </script>

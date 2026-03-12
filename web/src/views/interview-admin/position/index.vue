@@ -39,7 +39,11 @@
     >
       <template #queryBar>
         <QueryBarItem label="关键词">
-          <n-input v-model:value="queryItems.keyword" clearable placeholder="岗位 / 方向 / 部门" />
+          <n-input
+            v-model:value="queryItems.keyword"
+            clearable
+            placeholder="请输入岗位、方向或部门"
+          />
         </QueryBarItem>
         <QueryBarItem label="状态">
           <n-select v-model:value="queryItems.status" clearable :options="positionStatusOptions" />
@@ -67,16 +71,16 @@
       >
         <n-grid cols="2" x-gap="16">
           <n-form-item-gi label="岗位名称" path="title">
-            <n-input v-model:value="modalForm.title" />
+            <n-input v-model:value="modalForm.title" placeholder="请输入岗位名称" />
           </n-form-item-gi>
           <n-form-item-gi label="岗位类别" path="category">
             <n-input v-model:value="modalForm.category" placeholder="例如：产品 / 研发 / 运营" />
           </n-form-item-gi>
           <n-form-item-gi label="职级" path="level">
-            <n-input v-model:value="modalForm.level" placeholder="例如：P6 / Leader" />
+            <n-input v-model:value="modalForm.level" placeholder="例如：P6 / 负责人" />
           </n-form-item-gi>
           <n-form-item-gi label="所属部门" path="department">
-            <n-input v-model:value="modalForm.department" />
+            <n-input v-model:value="modalForm.department" placeholder="请输入所属部门" />
           </n-form-item-gi>
           <n-form-item-gi label="面试难度" path="difficulty">
             <n-select v-model:value="modalForm.difficulty" :options="difficultyOptions" />
@@ -87,16 +91,16 @@
           <n-form-item-gi label="封面链接" path="cover_image" span="2">
             <n-input
               v-model:value="modalForm.cover_image"
-              placeholder="可留空，前端会自动使用渐变背景"
+              placeholder="可留空，候选人端会显示默认封面"
             />
           </n-form-item-gi>
           <n-form-item-gi label="岗位标签" path="tags" span="2">
-            <n-input v-model:value="modalForm.tags" placeholder="多个标签用中文逗号分隔" />
+            <n-input v-model:value="modalForm.tags" placeholder="多个标签请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="亮点卖点" path="highlight" span="2">
             <n-input
               v-model:value="modalForm.highlight"
-              placeholder="例如：高增长业务、跨团队协作、汇报链路清晰"
+              placeholder="例如：业务增长明确、跨团队协作、职责边界清晰"
             />
           </n-form-item-gi>
           <n-form-item-gi label="岗位简介" path="summary" span="2">
@@ -104,6 +108,7 @@
               v-model:value="modalForm.summary"
               type="textarea"
               :autosize="{ minRows: 5, maxRows: 7 }"
+              placeholder="请输入岗位简介"
             />
           </n-form-item-gi>
         </n-grid>

@@ -6,7 +6,6 @@ import {
   NCheckboxGroup,
   NForm,
   NFormItem,
-  NImage,
   NInput,
   NSpace,
   NSwitch,
@@ -30,7 +29,7 @@ import api from '@/api'
 import TheIcon from '@/components/icon/TheIcon.vue'
 import { useUserStore } from '@/store'
 
-defineOptions({ name: '用户管理' })
+defineOptions({ name: '账号管理' })
 
 const $table = ref(null)
 const queryItems = ref({})
@@ -48,7 +47,7 @@ const {
   handleDelete,
   handleAdd,
 } = useCRUD({
-  name: '用户',
+  name: '账号',
   initForm: {},
   doCreate: api.createUser,
   doUpdate: api.updateUser,
@@ -67,7 +66,7 @@ onMounted(() => {
 
 const columns = [
   {
-    title: '名称',
+    title: '账号',
     key: 'username',
     width: 60,
     align: 'center',
@@ -81,7 +80,7 @@ const columns = [
     ellipsis: { tooltip: true },
   },
   {
-    title: '用户角色',
+    title: '所属角色',
     key: 'role',
     width: 60,
     align: 'center',
@@ -96,14 +95,14 @@ const columns = [
     },
   },
   {
-    title: '部门',
+    title: '所属部门',
     key: 'dept.name',
     align: 'center',
     width: 40,
     ellipsis: { tooltip: true },
   },
   {
-    title: '超级用户',
+    title: '管理员',
     key: 'is_superuser',
     align: 'center',
     width: 40,
@@ -201,43 +200,44 @@ const columns = [
                 ),
                 [[vPermission, 'delete/api/v1/user/delete']]
               ),
-            default: () => h('div', {}, '确定删除该用户吗?'),
+            default: () => h('div', {}, '确认删除该账号吗？'),
           }
         ),
-        !row.is_superuser && h(
-          NPopconfirm,
-          {
-            onPositiveClick: async () => {
-              try {
-                await api.resetPassword({ user_id: row.id });
-                $message.success('密码已成功重置为123456');
-                await $table.value?.handleSearch();
-              } catch (error) {
-                $message.error('重置密码失败: ' + error.message);
-              }
+        !row.is_superuser &&
+          h(
+            NPopconfirm,
+            {
+              onPositiveClick: async () => {
+                try {
+                  await api.resetPassword({ user_id: row.id })
+                  $message.success('密码已重置为 123456，请提醒该账号尽快修改。')
+                  await $table.value?.handleSearch()
+                } catch (error) {
+                  $message.error('重置密码失败：' + error.message)
+                }
+              },
+              onNegativeClick: () => {},
             },
-            onNegativeClick: () => {},
-          },
-          {
-            trigger: () =>
-              withDirectives(
-                h(
-                  NButton,
-                  {
-                    size: 'small',
-                    type: 'warning',
-                    style: 'margin-right: 8px;',
-                  },
-                  {
-                    default: () => '重置密码',
-                    icon: renderIcon('material-symbols:lock-reset', { size: 16 }),
-                  }
+            {
+              trigger: () =>
+                withDirectives(
+                  h(
+                    NButton,
+                    {
+                      size: 'small',
+                      type: 'warning',
+                      style: 'margin-right: 8px;',
+                    },
+                    {
+                      default: () => '重置密码',
+                      icon: renderIcon('material-symbols:lock-reset', { size: 16 }),
+                    }
+                  ),
+                  [[vPermission, 'post/api/v1/user/reset_password']]
                 ),
-                [[vPermission, 'post/api/v1/user/reset_password']]
-              ),
-            default: () => h('div', {}, '确定重置用户密码为123456吗?'),
-          }
-        ),
+              default: () => h('div', {}, '确认将该账号密码重置为 123456 吗？'),
+            }
+          ),
       ]
     },
   },
@@ -248,7 +248,7 @@ async function handleUpdateDisable(row) {
   if (!row.id) return
   const userStore = useUserStore()
   if (userStore.userId === row.id) {
-    $message.error('当前登录用户不可禁用！')
+    $message.error('当前登录账号不能被停用。')
     return
   }
   row.publishing = true
@@ -262,7 +262,7 @@ async function handleUpdateDisable(row) {
   row.dept_id = row.dept?.id
   try {
     await api.updateUser(row)
-    $message?.success(row.is_active ? '已取消禁用该用户' : '已禁用该用户')
+    $message?.success(row.is_active ? '已恢复该账号' : '已停用该账号')
     $table.value?.handleSearch()
   } catch (err) {
     // 有异常恢复原来的状态
@@ -294,14 +294,14 @@ const validateAddUser = {
   username: [
     {
       required: true,
-      message: '请输入名称',
+      message: '请输入账号名称',
       trigger: ['input', 'blur'],
     },
   ],
   email: [
     {
       required: true,
-      message: '请输入邮箱地址',
+      message: '请输入联系邮箱',
       trigger: ['input', 'change'],
     },
     {
@@ -309,7 +309,7 @@ const validateAddUser = {
       validator: (rule, value, callback) => {
         const re = /^[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+$/
         if (!re.test(modalForm.value.email)) {
-          callback('邮箱格式错误')
+          callback('邮箱格式不正确')
           return
         }
         callback()
@@ -319,14 +319,14 @@ const validateAddUser = {
   password: [
     {
       required: true,
-      message: '请输入密码',
+      message: '请输入登录密码',
       trigger: ['input', 'blur', 'change'],
     },
   ],
   confirmPassword: [
     {
       required: true,
-      message: '请再次输入密码',
+      message: '请再次输入登录密码',
       trigger: ['input'],
     },
     {
@@ -360,7 +360,7 @@ const validateAddUser = {
       :width="240"
       show-trigger="arrow-circle"
     >
-      <h1>部门列表</h1>
+      <h1>组织部门</h1>
       <br />
       <NTree
         block-line
@@ -373,10 +373,10 @@ const validateAddUser = {
       </NTree>
     </NLayoutSider>
     <NLayoutContent>
-      <CommonPage show-footer title="用户列表">
+      <CommonPage show-footer title="后台账号">
         <template #action>
           <NButton v-permission="'post/api/v1/user/create'" type="primary" @click="handleAdd">
-            <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建用户
+            <TheIcon icon="material-symbols:add" :size="18" class="mr-5" />新建账号
           </NButton>
         </template>
         <!-- 表格 -->
@@ -387,12 +387,12 @@ const validateAddUser = {
           :get-data="api.getUserList"
         >
           <template #queryBar>
-            <QueryBarItem label="名称" :label-width="40">
+            <QueryBarItem label="账号" :label-width="40">
               <NInput
                 v-model:value="queryItems.username"
                 clearable
                 type="text"
-                placeholder="请输入用户名称"
+                placeholder="按账号名称检索"
                 @keypress.enter="$table?.handleSearch()"
               />
             </QueryBarItem>
@@ -401,7 +401,7 @@ const validateAddUser = {
                 v-model:value="queryItems.email"
                 clearable
                 type="text"
-                placeholder="请输入邮箱"
+                placeholder="按邮箱地址检索"
                 @keypress.enter="$table?.handleSearch()"
               />
             </QueryBarItem>
@@ -423,19 +423,19 @@ const validateAddUser = {
             :model="modalForm"
             :rules="validateAddUser"
           >
-            <NFormItem label="用户名称" path="username">
-              <NInput v-model:value="modalForm.username" clearable placeholder="请输入用户名称" />
+            <NFormItem label="登录账号" path="username">
+              <NInput v-model:value="modalForm.username" clearable placeholder="请输入登录账号" />
             </NFormItem>
-            <NFormItem label="邮箱" path="email">
-              <NInput v-model:value="modalForm.email" clearable placeholder="请输入邮箱" />
+            <NFormItem label="联系邮箱" path="email">
+              <NInput v-model:value="modalForm.email" clearable placeholder="请输入联系邮箱" />
             </NFormItem>
-            <NFormItem v-if="modalAction === 'add'" label="密码" path="password">
+            <NFormItem v-if="modalAction === 'add'" label="登录密码" path="password">
               <NInput
                 v-model:value="modalForm.password"
                 show-password-on="mousedown"
                 type="password"
                 clearable
-                placeholder="请输入密码"
+                placeholder="请输入登录密码"
               />
             </NFormItem>
             <NFormItem v-if="modalAction === 'add'" label="确认密码" path="confirmPassword">
@@ -444,10 +444,10 @@ const validateAddUser = {
                 show-password-on="mousedown"
                 type="password"
                 clearable
-                placeholder="请确认密码"
+                placeholder="请再次输入登录密码"
               />
             </NFormItem>
-            <NFormItem label="角色" path="role_ids">
+            <NFormItem label="关联角色" path="role_ids">
               <NCheckboxGroup v-model:value="modalForm.role_ids">
                 <NSpace item-style="display: flex;">
                   <NCheckbox

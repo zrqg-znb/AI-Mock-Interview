@@ -5,10 +5,10 @@
         <div style="max-width: 760px">
           <p class="portal-chip">面试练习房间</p>
           <h1 class="portal-section-title" style="font-size: 38px; margin-top: 16px">
-            {{ session.position?.title || '模拟面试房间' }}
+            {{ session.position?.title || '面试练习房间' }}
           </h1>
           <p class="portal-section-subtitle">
-            现在按照正常面试节奏进行：先听题、再回答、再进入下一题。语音识别只是帮你记录内容，重点还是让你像平时面试一样把话说明白。
+            现在按正常面试节奏进行：先听题、再回答、再进入下一题。语音识别只负责记录内容，重点还是把你的经历和判断说明白。
           </p>
           <div class="portal-tag-cloud" style="margin-top: 16px">
             <span class="portal-chip"
@@ -21,10 +21,20 @@
 
         <div class="portal-actions">
           <n-button tertiary @click="router.push('/ai-interview/positions')">返回岗位列表</n-button>
-          <n-button type="primary" :disabled="finished" @click="requestNextQuestion"
+          <n-button
+            type="primary"
+            :disabled="finished || askingNext"
+            :loading="askingNext"
+            @click="requestNextQuestion"
             >下一题</n-button
           >
-          <n-button type="error" :disabled="finished" @click="finishInterview">结束练习</n-button>
+          <n-button
+            type="error"
+            :disabled="finished || finishing"
+            :loading="finishing"
+            @click="finishInterview"
+            >结束练习</n-button
+          >
         </div>
       </div>
     </div>
@@ -101,7 +111,7 @@
             >
           </div>
           <div class="portal-panel">
-            <p class="portal-kpi__label">房间控制</p>
+            <p class="portal-kpi__label">练习控制</p>
             <div class="portal-list" style="margin-top: 10px">
               <n-button
                 tertiary
@@ -110,8 +120,20 @@
               >
                 {{ recognitionActive ? '暂停语音识别' : '开启语音识别' }}
               </n-button>
-              <n-button tertiary @click="requestNextQuestion">进入下一题</n-button>
-              <n-button tertiary @click="finishInterview">结束并查看报告</n-button>
+              <n-button
+                tertiary
+                :loading="askingNext"
+                :disabled="askingNext || finished"
+                @click="requestNextQuestion"
+                >进入下一题</n-button
+              >
+              <n-button
+                tertiary
+                :loading="finishing"
+                :disabled="finishing || finished"
+                @click="finishInterview"
+                >结束并查看报告</n-button
+              >
             </div>
             <p class="portal-muted" style="margin-top: 14px">{{ recognitionHint }}</p>
           </div>
@@ -119,7 +141,7 @@
       </div>
 
       <div class="portal-card">
-        <h2 class="portal-section-title">视频与状态</h2>
+        <h2 class="portal-section-title">摄像头预览与状态</h2>
         <div class="portal-panel" style="margin-top: 18px; overflow: hidden">
           <video
             ref="videoRef"
@@ -206,7 +228,7 @@
       <n-result
         status="warning"
         title="没有找到这场练习"
-        description="请从岗位详情或推荐列表进入，这样系统才能带上完整的练习上下文。"
+        description="请从岗位详情或推荐列表进入，这样这场练习才会带上完整的岗位信息。"
       >
         <template #footer>
           <n-button type="primary" @click="router.push('/ai-interview/positions')"
@@ -232,9 +254,11 @@ const currentQuestion = ref('')
 const manualText = ref('')
 const interimTranscript = ref('')
 const recognitionActive = ref(false)
-const recognitionHint = ref('如果浏览器支持语音识别，系统会自动尝试开启；不支持时也可以手动补录。')
+const recognitionHint = ref('如果浏览器支持语音识别，会自动尝试开启；不支持时也可以手动补录。')
 const cameraError = ref('')
 const finished = ref(false)
+const askingNext = ref(false)
+const finishing = ref(false)
 
 let mediaStream = null
 let recognition = null
@@ -268,7 +292,7 @@ function hydrateSession() {
 
 async function setupCamera() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    cameraError.value = '当前浏览器不支持摄像头能力，你仍然可以继续进行文本版练习。'
+    cameraError.value = '当前浏览器不支持摄像头能力，你仍然可以继续进行文字版练习。'
     return
   }
   try {
@@ -336,7 +360,7 @@ function toggleRecognition(forceStart = false) {
   try {
     recognition.start()
     recognitionActive.value = true
-    recognitionHint.value = '语音识别已开启，系统会把稳定识别到的句子按段记录下来。'
+    recognitionHint.value = '语音识别已开启，会把识别较稳定的句子按段记录下来。'
   } catch (error) {
     recognitionHint.value = '浏览器阻止了自动开启语音识别，请点击按钮重试或使用手动补录。'
   }
@@ -372,40 +396,50 @@ async function submitManualText() {
 }
 
 async function requestNextQuestion() {
-  if (finished.value) return
-  const res = await api.nextMockInterviewQuestion({ session_id: session.value.id })
-  if (res.data.completed) {
-    $message.info('题目已经完成，可以结束练习并生成报告了。')
-    return
+  if (finished.value || askingNext.value) return
+  askingNext.value = true
+  try {
+    const res = await api.nextMockInterviewQuestion({ session_id: session.value.id })
+    if (res.data.completed) {
+      $message.info('题目已经完成，可以结束练习并查看报告了。')
+      return
+    }
+    currentQuestion.value = res.data.question
+    session.value = {
+      ...session.value,
+      ...(res.data.session || {}),
+      current_round: res.data.round_no,
+    }
+    timeline.value.push({
+      id: `ai-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      speaker: 'ai',
+      content: res.data.question,
+    })
+    window.sessionStorage.setItem(
+      `mock-session:${session.value.id}`,
+      JSON.stringify({ ...session.value, turns: timeline.value })
+    )
+    await nextTick()
+    scrollToBottom()
+  } finally {
+    askingNext.value = false
   }
-  currentQuestion.value = res.data.question
-  session.value = {
-    ...session.value,
-    ...(res.data.session || {}),
-    current_round: res.data.round_no,
-  }
-  timeline.value.push({
-    id: `ai-${Date.now()}`,
-    created_at: new Date().toISOString(),
-    speaker: 'ai',
-    content: res.data.question,
-  })
-  window.sessionStorage.setItem(
-    `mock-session:${session.value.id}`,
-    JSON.stringify({ ...session.value, turns: timeline.value })
-  )
-  await nextTick()
-  scrollToBottom()
 }
 
 async function finishInterview() {
-  if (finished.value) return
-  const res = await api.finishMockInterview({ session_id: session.value.id })
-  finished.value = true
-  stopRecognition()
-  const report = res.data.report
-  if (report?.id) {
-    router.push(`/ai-interview/reports/${report.id}`)
+  if (finished.value || finishing.value) return
+  finishing.value = true
+  try {
+    const res = await api.finishMockInterview({ session_id: session.value.id })
+    finished.value = true
+    stopRecognition()
+    const report = res.data.report
+    if (report?.id) {
+      router.push(`/ai-interview/reports/${report.id}`)
+    }
+  } finally {
+    finishing.value = false
   }
 }
 

@@ -81,10 +81,16 @@
               v-model:value="modalForm.candidate_id"
               filterable
               :options="candidateOptions"
+              placeholder="请选择候选人"
             />
           </n-form-item-gi>
           <n-form-item-gi label="岗位" path="position_id">
-            <n-select v-model:value="modalForm.position_id" filterable :options="positionOptions" />
+            <n-select
+              v-model:value="modalForm.position_id"
+              filterable
+              :options="positionOptions"
+              placeholder="请选择岗位"
+            />
           </n-form-item-gi>
           <n-form-item-gi label="关联 JD" path="jd_id">
             <n-select
@@ -92,6 +98,7 @@
               clearable
               filterable
               :options="availableJDOptions"
+              placeholder="请选择关联 JD"
             />
           </n-form-item-gi>
           <n-form-item-gi label="状态" path="status">
@@ -118,6 +125,7 @@
               v-model:value="modalForm.context_summary"
               type="textarea"
               :autosize="{ minRows: 4, maxRows: 6 }"
+              placeholder="请输入本场练习的补充说明"
             />
           </n-form-item-gi>
         </n-grid>

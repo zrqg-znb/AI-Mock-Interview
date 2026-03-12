@@ -39,13 +39,13 @@
     >
       <template #queryBar>
         <QueryBarItem label="用户搜索">
-          <n-input v-model:value="queryItems.username" clearable placeholder="用户名 / 邮箱" />
+          <n-input v-model:value="queryItems.username" clearable placeholder="请输入用户名或邮箱" />
         </QueryBarItem>
         <QueryBarItem label="目标岗位">
           <n-input
             v-model:value="queryItems.target_position"
             clearable
-            placeholder="例如：数据产品经理"
+            placeholder="请输入目标岗位"
           />
         </QueryBarItem>
         <QueryBarItem label="求职状态">
@@ -53,7 +53,7 @@
             v-model:value="queryItems.job_status"
             clearable
             :options="candidateStatusOptions"
-            placeholder="全部状态"
+            placeholder="请选择状态"
           />
         </QueryBarItem>
       </template>
@@ -81,7 +81,7 @@
               :options="userOptions"
               clearable
               filterable
-              placeholder="先在系统用户管理里创建账号"
+              placeholder="请选择已创建的系统账号"
             />
           </n-form-item-gi>
           <n-form-item-gi label="一句话抬头" path="headline">
@@ -113,20 +113,21 @@
           <n-form-item-gi label="教育信息" path="education">
             <n-input
               v-model:value="modalForm.education"
-              placeholder="例如：硕士 / 985 / 海外背景"
+              placeholder="例如：硕士 / 本科 / 转行背景"
             />
           </n-form-item-gi>
           <n-form-item-gi label="头像链接" path="avatar">
-            <n-input v-model:value="modalForm.avatar" placeholder="https://..." />
+            <n-input v-model:value="modalForm.avatar" placeholder="请输入头像链接" />
           </n-form-item-gi>
           <n-form-item-gi label="技能标签" path="skill_tags" span="2">
-            <n-input v-model:value="modalForm.skill_tags" placeholder="多个标签用中文逗号分隔" />
+            <n-input v-model:value="modalForm.skill_tags" placeholder="多个标签请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="个人优势" path="strengths" span="2">
             <n-input
               v-model:value="modalForm.strengths"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 4 }"
+              placeholder="请输入候选人的优势描述"
             />
           </n-form-item-gi>
           <n-form-item-gi label="简历正文" path="resume_text" span="2">
@@ -134,6 +135,7 @@
               v-model:value="modalForm.resume_text"
               type="textarea"
               :autosize="{ minRows: 8, maxRows: 12 }"
+              placeholder="请输入简历正文或项目经历"
             />
           </n-form-item-gi>
         </n-grid>

@@ -44,11 +44,11 @@
             clearable
             filterable
             :options="positionOptions"
-            placeholder="全部岗位"
+            placeholder="请选择岗位"
           />
         </QueryBarItem>
         <QueryBarItem label="关键词">
-          <n-input v-model:value="queryItems.keyword" clearable placeholder="JD 内容关键词" />
+          <n-input v-model:value="queryItems.keyword" clearable placeholder="请输入 JD 关键词" />
         </QueryBarItem>
         <QueryBarItem label="启用状态">
           <n-select v-model:value="queryItems.is_active" clearable :options="activeOptions" />
@@ -91,11 +91,11 @@
           <n-form-item-gi label="必备技能" path="must_have_tags" span="2">
             <n-input
               v-model:value="modalForm.must_have_tags"
-              placeholder="多个标签用中文逗号分隔"
+              placeholder="多个标签请用中文逗号分隔"
             />
           </n-form-item-gi>
           <n-form-item-gi label="加分技能" path="bonus_tags" span="2">
-            <n-input v-model:value="modalForm.bonus_tags" placeholder="多个标签用中文逗号分隔" />
+            <n-input v-model:value="modalForm.bonus_tags" placeholder="多个标签请用中文逗号分隔" />
           </n-form-item-gi>
           <n-form-item-gi label="评分维度" path="scoring_dimensions" span="2">
             <n-input
@@ -108,6 +108,7 @@
               v-model:value="modalForm.prompt_hint"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 4 }"
+              placeholder="请输入补充提示"
             />
           </n-form-item-gi>
           <n-form-item-gi label="JD 正文" path="jd_text" span="2">
@@ -115,6 +116,7 @@
               v-model:value="modalForm.jd_text"
               type="textarea"
               :autosize="{ minRows: 10, maxRows: 14 }"
+              placeholder="请输入 JD 正文"
             />
           </n-form-item-gi>
         </n-grid>

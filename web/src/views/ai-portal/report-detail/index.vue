@@ -5,7 +5,7 @@
         <div style="max-width: 760px">
           <p class="portal-chip">练习报告</p>
           <h1 class="portal-section-title" style="font-size: 40px; margin-top: 16px">
-            {{ report.position?.title || '模拟面试报告' }}
+            {{ report.position?.title || '面试练习报告' }}
           </h1>
           <p class="portal-section-subtitle">{{ report.overview }}</p>
           <div class="portal-tag-cloud" style="margin-top: 18px">
@@ -29,7 +29,7 @@
             <p class="portal-kpi__label">本次得分</p>
             <h2 class="portal-section-title" style="font-size: 44px">{{ report.total_score }}</h2>
             <p class="portal-section-subtitle">
-              这份报告更像一页练习总结，帮助你知道下一次应该重点改哪里。
+              这份报告是一页练习总结，帮助你知道下一次应该重点改哪里。
             </p>
           </div>
           <div class="portal-score-ring">
@@ -61,9 +61,7 @@
 
       <div class="portal-card">
         <h2 class="portal-section-title">能力概览</h2>
-        <p class="portal-section-subtitle">
-          不做复杂的炫技图表，直接把重点信息整理成清晰的分组，回看更省心。
-        </p>
+        <p class="portal-section-subtitle">重点信息已经按分组整理好，回看时会更直接。</p>
         <div class="portal-grid cols-2" style="margin-top: 20px">
           <div v-for="(value, key) in report.dimension_scores || {}" :key="key" class="portal-kpi">
             <p class="portal-kpi__label">{{ key }}</p>
