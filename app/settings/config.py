@@ -54,6 +54,18 @@ class Settings(BaseSettings):
         default=18,
         validation_alias=AliasChoices("AI_REQUEST_TIMEOUT", "DEEPSEEK_REQUEST_TIMEOUT"),
     )
+    XFYUN_APP_ID: str = Field(default="", validation_alias=AliasChoices("XFYUN_APP_ID", "XFYUN_APPID"))
+    XFYUN_API_KEY: str = Field(default="", validation_alias=AliasChoices("XFYUN_API_KEY", "XFYUN_KEY"))
+    XFYUN_API_SECRET: str = Field(
+        default="",
+        validation_alias=AliasChoices("XFYUN_API_SECRET", "XFYUN_SECRET"),
+    )
+    XFYUN_ASR_HOST: str = Field(default="ws-api.xfyun.cn")
+    XFYUN_ASR_PATH: str = Field(default="/v2/iat")
+    XFYUN_ASR_DOMAIN: str = Field(default="iat")
+    XFYUN_ASR_LANGUAGE: str = Field(default="zh_cn")
+    XFYUN_ASR_ACCENT: str = Field(default="mandarin")
+    XFYUN_ASR_VAD_EOS: int = Field(default=10000)
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
     @property

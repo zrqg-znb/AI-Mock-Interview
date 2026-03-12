@@ -3,12 +3,12 @@
     <div class="portal-hero">
       <div class="portal-row" style="align-items: flex-start; flex-wrap: wrap">
         <div style="max-width: 760px">
-          <p class="portal-chip">面试练习房间</p>
+          <p class="portal-chip">面试练习房间 (科大讯飞 ASR 增强版)</p>
           <h1 class="portal-section-title" style="font-size: 38px; margin-top: 16px">
             {{ session.position?.title || '面试练习房间' }}
           </h1>
           <p class="portal-section-subtitle">
-            现在按正常面试节奏进行：先听题、再回答、再进入下一题。语音识别只负责记录内容，重点还是把你的经历和判断说明白。
+            现在按正常面试节奏进行：先听题、再回答、再进入下一题。语音识别由科大讯飞流式接口驱动，准确率更高。
           </p>
           <div class="portal-tag-cloud" style="margin-top: 16px">
             <span class="portal-chip"
@@ -39,7 +39,7 @@
       </div>
     </div>
 
-    <div class="portal-grid cols-3">
+    <div class="cols-3 portal-grid">
       <div class="portal-card" style="grid-column: span 2">
         <div class="portal-row" style="align-items: flex-start">
           <div>
@@ -104,7 +104,7 @@
               v-model:value="manualText"
               type="textarea"
               :autosize="{ minRows: 4, maxRows: 6 }"
-              placeholder="如果浏览器不支持语音识别，可以直接把回答补在这里。"
+              placeholder="可以直接把回答补在这里，或者对 ASR 结果进行微调。"
             />
             <n-button type="primary" style="margin-top: 12px" @click="submitManualText"
               >提交这段回答</n-button
@@ -118,7 +118,7 @@
                 :type="recognitionActive ? 'warning' : 'primary'"
                 @click="toggleRecognition"
               >
-                {{ recognitionActive ? '暂停语音识别' : '开启语音识别' }}
+                {{ recognitionActive ? '停止录音' : '开始回答' }}
               </n-button>
               <n-button
                 tertiary
@@ -143,92 +143,79 @@
       <div class="portal-card">
         <h2 class="portal-section-title">摄像头预览与状态</h2>
         <div class="portal-panel" style="margin-top: 18px; overflow: hidden">
+          <div
+            v-if="cameraError"
+            style="
+              height: 240px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #f8f8f8;
+            "
+          >
+            <p class="portal-muted">{{ cameraError }}</p>
+          </div>
           <video
+            v-else
             ref="videoRef"
             autoplay
             muted
             playsinline
-            style="width: 100%; min-height: 240px; border-radius: 18px; background: #f0e8df"
+            style="width: 100%; height: 240px; object-fit: cover; border-radius: 8px"
           ></video>
-          <n-alert
-            v-if="cameraError"
-            type="warning"
-            style="margin-top: 12px; border-radius: 18px"
-            >{{ cameraError }}</n-alert
-          >
         </div>
 
-        <div class="portal-grid cols-2" style="margin-top: 18px">
-          <div class="portal-kpi">
-            <p class="portal-kpi__label">关键词覆盖</p>
-            <p class="portal-kpi__value">{{ metrics.keyword_hit_rate || 0 }}</p>
-            <n-progress
-              type="line"
-              :percentage="metrics.keyword_hit_rate || 0"
-              :show-indicator="false"
-              status="success"
-            />
-          </div>
-          <div class="portal-kpi">
-            <p class="portal-kpi__label">回答完整度</p>
-            <p class="portal-kpi__value">{{ metrics.completeness || 0 }}</p>
-            <n-progress
-              type="line"
-              :percentage="metrics.completeness || 0"
-              :show-indicator="false"
-              status="warning"
-            />
-          </div>
-          <div class="portal-kpi">
-            <p class="portal-kpi__label">表达节奏</p>
-            <p class="portal-kpi__value">{{ metrics.expression_pace || 0 }}</p>
-            <n-progress
-              type="line"
-              :percentage="metrics.expression_pace || 0"
-              :show-indicator="false"
-              status="success"
-            />
-          </div>
-          <div class="portal-kpi">
-            <p class="portal-kpi__label">稳定度</p>
-            <p class="portal-kpi__value">{{ metrics.communication_stability || 0 }}</p>
-            <n-progress
-              type="line"
-              :percentage="metrics.communication_stability || 0"
-              :show-indicator="false"
-              status="success"
-            />
-          </div>
-        </div>
-
-        <div class="portal-panel" style="margin-top: 18px">
-          <p class="portal-kpi__label">当前题目</p>
-          <p style="line-height: 1.9; margin-top: 10px">
-            {{ currentQuestion || '正在等待下一题...' }}
-          </p>
-        </div>
-
-        <div class="portal-panel" style="margin-top: 18px">
-          <p class="portal-kpi__label">已覆盖关键词</p>
-          <div class="portal-tag-cloud" style="margin-top: 12px">
-            <span v-for="tag in metrics.matched_keywords || []" :key="tag" class="portal-chip">{{
-              tag
-            }}</span>
-            <span v-if="!metrics.matched_keywords?.length" class="portal-muted"
-              >回答再多一些，这里会逐步出现关键词。</span
-            >
+        <div style="margin-top: 24px">
+          <h3 class="portal-kpi__label" style="margin-bottom: 12px">当前实时表现</h3>
+          <div class="portal-grid cols-2">
+            <div class="portal-panel" style="padding: 16px">
+              <p class="portal-muted" style="font-size: 13px">关键词覆盖</p>
+              <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
+                {{ metrics.keyword_coverage || 0 }}%
+              </p>
+            </div>
+            <div class="portal-panel" style="padding: 16px">
+              <p class="portal-muted" style="font-size: 13px">专业深度</p>
+              <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
+                {{ metrics.professional_depth || 0 }}
+              </p>
+            </div>
+            <div class="portal-panel" style="padding: 16px">
+              <p class="portal-muted" style="font-size: 13px">逻辑清晰度</p>
+              <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
+                {{ metrics.logic_clarity || 0 }}
+              </p>
+            </div>
+            <div class="portal-panel" style="padding: 16px">
+              <p class="portal-muted" style="font-size: 13px">录入总字数</p>
+              <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
+                {{ metrics.total_words || 0 }}
+              </p>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </section>
 
-  <section v-else class="portal-page">
-    <div class="portal-card">
+    <n-modal v-model:show="finished" :mask-closable="false" style="width: 480px">
       <n-result
-        status="warning"
-        title="没有找到这场练习"
-        description="请从岗位详情或推荐列表进入，这样这场练习才会带上完整的岗位信息。"
+        status="success"
+        title="练习已结束"
+        description="系统正在生成结构化报告，你可以点击下方按钮查看最终评估结果。"
+      >
+        <template #footer>
+          <n-button type="primary" @click="router.push('/ai-interview/reports')"
+            >查看历史报告</n-button
+          >
+        </template>
+      </n-result>
+    </n-modal>
+
+    <div v-if="!session" style="padding: 120px 0; text-align: center">
+      <n-result
+        status="404"
+        title="未找到面试场次"
+        description="请确认你是否是从岗位推荐列表进入的。只有点击'进入练习'才会带上完整的岗位信息。"
       >
         <template #footer>
           <n-button type="primary" @click="router.push('/ai-interview/positions')"
@@ -250,31 +237,40 @@ const timelineRef = ref(null)
 const session = ref(null)
 const timeline = ref([])
 const metrics = ref({})
-const currentQuestion = ref('')
 const manualText = ref('')
 const interimTranscript = ref('')
 const recognitionActive = ref(false)
-const recognitionHint = ref('如果浏览器支持语音识别，会自动尝试开启；不支持时也可以手动补录。')
+const recognitionHint = ref('点击“开始回答”启动科大讯飞语音识别。')
 const cameraError = ref('')
 const finished = ref(false)
 const askingNext = ref(false)
 const finishing = ref(false)
 
 let mediaStream = null
-let recognition = null
 let segmentIndex = 1
+
+let audioContext = null
+let sourceNode = null
+let processor = null
+let silentGainNode = null
+let asrSocket = null
+let recognitionConnecting = false
+let recognitionStopping = false
+let stopWaitPromise = null
+let stopWaitResolve = null
+let stopWaitTimer = null
+let connectTimeoutTimer = null
 
 onMounted(async () => {
   hydrateSession()
   await setupCamera()
-  setupRecognition()
   await nextTick()
   scrollToBottom()
 })
 
 onBeforeUnmount(() => {
+  void stopRecognition({ submitTranscript: false, waitForFinalResult: false })
   stopCamera()
-  stopRecognition()
 })
 
 function hydrateSession() {
@@ -284,24 +280,49 @@ function hydrateSession() {
   session.value = data
   timeline.value = data.turns || []
   metrics.value = data.latest_metrics || {}
-  currentQuestion.value =
-    data.current_question?.question || data.turns?.slice(-1)?.[0]?.content || ''
   const userTurns = timeline.value.filter((item) => item.speaker === 'user')
   segmentIndex = (userTurns[userTurns.length - 1]?.segment_index || 0) + 1
 }
 
+function persistSession() {
+  if (!session.value?.id) return
+  window.sessionStorage.setItem(
+    `mock-session:${session.value.id}`,
+    JSON.stringify({
+      ...session.value,
+      turns: timeline.value,
+      latest_metrics: metrics.value,
+    })
+  )
+}
+
 async function setupCamera() {
+  if (mediaStream) {
+    if (videoRef.value) {
+      videoRef.value.srcObject = mediaStream
+    }
+    return
+  }
   if (!navigator.mediaDevices?.getUserMedia) {
     cameraError.value = '当前浏览器不支持摄像头能力，你仍然可以继续进行文字版练习。'
     return
   }
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    })
     if (videoRef.value) {
       videoRef.value.srcObject = mediaStream
     }
-  } catch (error) {
-    cameraError.value = '摄像头权限被拒绝或设备不可用，但不影响继续完成这场练习。'
+    cameraError.value = ''
+  } catch {
+    cameraError.value = '摄像头或麦克风权限被拒绝，请检查浏览器权限设置。'
   }
 }
 
@@ -311,73 +332,306 @@ function stopCamera() {
   mediaStream = null
 }
 
-function setupRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SpeechRecognition) {
-    recognitionHint.value = '当前浏览器不支持语音识别，请使用手动补录方式继续。'
-    return
-  }
-
-  recognition = new SpeechRecognition()
-  recognition.lang = 'zh-CN'
-  recognition.continuous = true
-  recognition.interimResults = true
-
-  recognition.onresult = (event) => {
-    let interim = ''
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript.trim()
-      if (!transcript) continue
-      if (event.results[i].isFinal) {
-        interimTranscript.value = ''
-        submitSegment(transcript)
-      } else {
-        interim += transcript
-      }
-    }
-    interimTranscript.value = interim
-  }
-
-  recognition.onend = () => {
-    if (recognitionActive.value && !finished.value) {
-      try {
-        recognition.start()
-      } catch (error) {
-        recognitionActive.value = false
-      }
-    }
-  }
-
-  toggleRecognition(true)
+function buildAsrSocketUrl() {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${protocol}://${window.location.host}/api/v1/mock_interview/ws/asr`
 }
 
-function toggleRecognition(forceStart = false) {
-  if (!recognition) return
-  if (recognitionActive.value && !forceStart) {
-    stopRecognition()
+function cleanupAudioPipeline() {
+  if (processor) {
+    processor.onaudioprocess = null
+    processor.disconnect()
+    processor = null
+  }
+  if (sourceNode) {
+    sourceNode.disconnect()
+    sourceNode = null
+  }
+  if (silentGainNode) {
+    silentGainNode.disconnect()
+    silentGainNode = null
+  }
+  if (audioContext) {
+    const context = audioContext
+    audioContext = null
+    void context.close().catch(() => {})
+  }
+}
+
+function cleanupSocket(close = false) {
+  if (!asrSocket) return
+  const socket = asrSocket
+  asrSocket = null
+  if (connectTimeoutTimer) {
+    window.clearTimeout(connectTimeoutTimer)
+    connectTimeoutTimer = null
+  }
+  socket.onopen = null
+  socket.onmessage = null
+  socket.onerror = null
+  socket.onclose = null
+  if (
+    close &&
+    (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)
+  ) {
+    socket.close()
+  }
+}
+
+function resolveStopWait() {
+  if (stopWaitTimer) {
+    window.clearTimeout(stopWaitTimer)
+    stopWaitTimer = null
+  }
+  if (stopWaitResolve) {
+    const resolve = stopWaitResolve
+    stopWaitResolve = null
+    stopWaitPromise = null
+    resolve()
     return
   }
-  try {
-    recognition.start()
+  stopWaitPromise = null
+}
+
+function createStopWaitPromise(timeoutMs = 5000) {
+  if (stopWaitPromise) return stopWaitPromise
+  stopWaitPromise = new Promise((resolve) => {
+    stopWaitResolve = resolve
+    stopWaitTimer = window.setTimeout(() => {
+      resolveStopWait()
+    }, timeoutMs)
+  })
+  return stopWaitPromise
+}
+
+function downsampleTo16k(buffer, inputSampleRate) {
+  if (!buffer?.length) return new Int16Array()
+  if (inputSampleRate === 16000) {
+    return convertFloat32ToInt16(buffer)
+  }
+  const sampleRateRatio = inputSampleRate / 16000
+  const outputLength = Math.max(1, Math.round(buffer.length / sampleRateRatio))
+  const output = new Int16Array(outputLength)
+  let offsetResult = 0
+  let offsetBuffer = 0
+
+  while (offsetResult < outputLength) {
+    const nextOffsetBuffer = Math.min(
+      buffer.length,
+      Math.round((offsetResult + 1) * sampleRateRatio)
+    )
+    let sum = 0
+    let count = 0
+    for (let index = offsetBuffer; index < nextOffsetBuffer; index += 1) {
+      sum += buffer[index]
+      count += 1
+    }
+    const sample = count ? sum / count : buffer[offsetBuffer] || 0
+    const clamped = Math.max(-1, Math.min(1, sample))
+    output[offsetResult] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff
+    offsetResult += 1
+    offsetBuffer = nextOffsetBuffer
+  }
+
+  return output
+}
+
+function convertFloat32ToInt16(buffer) {
+  const output = new Int16Array(buffer.length)
+  for (let index = 0; index < buffer.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, buffer[index]))
+    output[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+  }
+  return output
+}
+
+async function startRecognition() {
+  if (recognitionActive.value || recognitionConnecting || recognitionStopping) return
+  if (!mediaStream) {
+    await setupCamera()
+  }
+  if (!mediaStream) return
+
+  cleanupAudioPipeline()
+  cleanupSocket(true)
+  interimTranscript.value = ''
+  recognitionConnecting = true
+  recognitionHint.value = '正在连接讯飞语音识别...'
+
+  const socket = new WebSocket(buildAsrSocketUrl())
+  socket.binaryType = 'arraybuffer'
+  asrSocket = socket
+  connectTimeoutTimer = window.setTimeout(() => {
+    if (asrSocket !== socket || socket.readyState === WebSocket.OPEN) return
+    recognitionConnecting = false
+    recognitionHint.value = '连接讯飞语音识别超时，请确认后端服务和前端代理是否已启动。'
+    window.$message?.error('连接讯飞语音识别超时，请确认后端服务和前端代理是否已启动。')
+    cleanupSocket(true)
+  }, 8000)
+
+  socket.onopen = async () => {
+    if (asrSocket !== socket) return
+    if (connectTimeoutTimer) {
+      window.clearTimeout(connectTimeoutTimer)
+      connectTimeoutTimer = null
+    }
+    recognitionConnecting = false
     recognitionActive.value = true
-    recognitionHint.value = '语音识别已开启，会把识别较稳定的句子按段记录下来。'
-  } catch (error) {
-    recognitionHint.value = '浏览器阻止了自动开启语音识别，请点击按钮重试或使用手动补录。'
+    recognitionHint.value = '正在识别您的语音...'
+    try {
+      await startAudioProcessing()
+    } catch {
+      recognitionHint.value = '麦克风初始化失败，请检查浏览器权限。'
+      window.$message?.error('麦克风初始化失败，请检查浏览器权限或刷新页面重试。')
+      await stopRecognition({ submitTranscript: false, waitForFinalResult: false })
+    }
+  }
+
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data)
+    if (data.type === 'asr_result') {
+      interimTranscript.value = data.text || ''
+      recognitionHint.value = data.is_final
+        ? '识别完成，正在整理最终文本...'
+        : '正在识别您的语音...'
+      return
+    }
+    if (data.type === 'asr_completed') {
+      interimTranscript.value = data.text || interimTranscript.value
+      recognitionHint.value = interimTranscript.value
+        ? '识别完成，正在提交回答...'
+        : '未识别到有效语音。'
+      resolveStopWait()
+      return
+    }
+    if (data.type === 'asr_error') {
+      recognitionHint.value = data.message || '语音识别失败，请稍后重试。'
+      window.$message?.error(recognitionHint.value)
+      resolveStopWait()
+    }
+  }
+
+  socket.onerror = () => {
+    if (connectTimeoutTimer) {
+      window.clearTimeout(connectTimeoutTimer)
+      connectTimeoutTimer = null
+    }
+    recognitionConnecting = false
+    if (!recognitionStopping) {
+      recognitionHint.value = '语音识别连接失败，请稍后重试。'
+      window.$message?.error('语音识别连接失败，请稍后重试。')
+    }
+  }
+
+  socket.onclose = () => {
+    if (connectTimeoutTimer) {
+      window.clearTimeout(connectTimeoutTimer)
+      connectTimeoutTimer = null
+    }
+    if (asrSocket === socket) {
+      asrSocket = null
+    }
+    recognitionConnecting = false
+    recognitionActive.value = false
+    cleanupAudioPipeline()
+    resolveStopWait()
+    if (!recognitionStopping && !finished.value) {
+      recognitionHint.value = '语音识别已停止。'
+    }
   }
 }
 
-function stopRecognition() {
-  if (!recognition) return
+async function startAudioProcessing() {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)()
+  await audioContext.resume()
+  const inputSampleRate = audioContext.sampleRate
+  sourceNode = audioContext.createMediaStreamSource(mediaStream)
+  processor = audioContext.createScriptProcessor(4096, 1, 1)
+  silentGainNode = audioContext.createGain()
+  silentGainNode.gain.value = 0
+
+  processor.onaudioprocess = (event) => {
+    if (!recognitionActive.value || recognitionStopping || asrSocket?.readyState !== WebSocket.OPEN)
+      return
+    const pcmData = downsampleTo16k(event.inputBuffer.getChannelData(0), inputSampleRate)
+    if (!pcmData.length) return
+    asrSocket.send(pcmData.buffer)
+  }
+
+  sourceNode.connect(processor)
+  processor.connect(silentGainNode)
+  silentGainNode.connect(audioContext.destination)
+}
+
+async function flushInterimTranscript() {
+  const content = interimTranscript.value.trim()
+  if (!content) return
+  await submitSegment(content)
+  interimTranscript.value = ''
+  recognitionHint.value = '本段回答已提交。'
+}
+
+async function stopRecognition({ submitTranscript = true, waitForFinalResult = true } = {}) {
+  if (recognitionStopping) {
+    if (stopWaitPromise) {
+      await stopWaitPromise
+    }
+    if (submitTranscript) {
+      await flushInterimTranscript()
+    }
+    return
+  }
+
+  const socket = asrSocket
+  const hasActiveResources = Boolean(socket || processor || audioContext || sourceNode)
+  cleanupAudioPipeline()
+  recognitionConnecting = false
   recognitionActive.value = false
+
+  if (!hasActiveResources) {
+    if (submitTranscript) {
+      await flushInterimTranscript()
+    }
+    if (!finished.value && !submitTranscript) {
+      recognitionHint.value = '语音识别已停止。'
+    }
+    return
+  }
+
+  recognitionStopping = true
   try {
-    recognition.stop()
-  } catch (error) {
-    console.log(error)
+    if (socket && waitForFinalResult && socket.readyState === WebSocket.OPEN) {
+      recognitionHint.value = '正在结束录音并等待最终转写...'
+      const waiting = createStopWaitPromise()
+      socket.send(JSON.stringify({ type: 'end_stream' }))
+      await waiting
+    }
+  } finally {
+    cleanupSocket(true)
+    recognitionStopping = false
+  }
+
+  if (submitTranscript) {
+    await flushInterimTranscript()
+  } else if (!finished.value) {
+    recognitionHint.value = '语音识别已停止。'
+  }
+}
+
+async function toggleRecognition() {
+  try {
+    if (recognitionActive.value || recognitionConnecting) {
+      await stopRecognition()
+    } else {
+      await startRecognition()
+    }
+  } catch {
+    window.$message?.error('语音识别处理失败，请稍后重试。')
   }
 }
 
 async function submitSegment(content) {
-  if (!content || finished.value) return
+  if (!content || finished.value || !session.value?.id) return
   const res = await api.submitMockInterviewSegment({
     session_id: session.value.id,
     content,
@@ -387,6 +641,7 @@ async function submitSegment(content) {
   metrics.value = res.data.metrics || metrics.value
   segmentIndex += 1
   manualText.value = ''
+  persistSession()
   await nextTick()
   scrollToBottom()
 }
@@ -397,14 +652,20 @@ async function submitManualText() {
 
 async function requestNextQuestion() {
   if (finished.value || askingNext.value) return
+  try {
+    await stopRecognition()
+  } catch {
+    window.$message?.error('当前回答还没有成功提交，请稍后再试。')
+    return
+  }
+
   askingNext.value = true
   try {
     const res = await api.nextMockInterviewQuestion({ session_id: session.value.id })
     if (res.data.completed) {
-      $message.info('题目已经完成，可以结束练习并查看报告了。')
+      window.$message?.info('题目已经完成，可以结束练习并查看报告了。')
       return
     }
-    currentQuestion.value = res.data.question
     session.value = {
       ...session.value,
       ...(res.data.session || {}),
@@ -416,10 +677,7 @@ async function requestNextQuestion() {
       speaker: 'ai',
       content: res.data.question,
     })
-    window.sessionStorage.setItem(
-      `mock-session:${session.value.id}`,
-      JSON.stringify({ ...session.value, turns: timeline.value })
-    )
+    persistSession()
     await nextTick()
     scrollToBottom()
   } finally {
@@ -429,11 +687,17 @@ async function requestNextQuestion() {
 
 async function finishInterview() {
   if (finished.value || finishing.value) return
+  try {
+    await stopRecognition()
+  } catch {
+    window.$message?.error('最后一段回答提交失败，请先重试后再结束练习。')
+    return
+  }
+
   finishing.value = true
   try {
     const res = await api.finishMockInterview({ session_id: session.value.id })
     finished.value = true
-    stopRecognition()
     const report = res.data.report
     if (report?.id) {
       router.push(`/ai-interview/reports/${report.id}`)

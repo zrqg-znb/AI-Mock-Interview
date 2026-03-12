@@ -88,6 +88,17 @@ cp .env.example .env
 - `AI_MODEL_NAME`
 - `AI_REQUEST_TIMEOUT`
 
+如果要启用讯飞流式语音转写，还需要补齐这些配置：
+- `XFYUN_APP_ID`
+- `XFYUN_API_KEY`
+- `XFYUN_API_SECRET`
+- `XFYUN_ASR_HOST`
+- `XFYUN_ASR_PATH`
+- `XFYUN_ASR_DOMAIN`
+- `XFYUN_ASR_LANGUAGE`
+- `XFYUN_ASR_ACCENT`
+- `XFYUN_ASR_VAD_EOS`
+
 注意：
 - `.env`、`.env.local` 已被 `.gitignore` 忽略，不要提交真实密钥。
 - 如果 API Key 曾在聊天、截图或公开记录中暴露，建议立即轮换。
