@@ -216,10 +216,3 @@ pnpm -C web exec eslint src/views/login/index.vue src/views/workbench/index.vue
 ```bash
 pnpm -C web build
 ```
-
-## 开源注意事项
-
-如果你准备把仓库公开：
-- 请确认 `.env` 未被提交
-- 请轮换任何曾经暴露过的数据库密码或模型密钥
-- 请清理本地演示数据、截图和日志文件
