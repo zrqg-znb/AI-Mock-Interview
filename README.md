@@ -99,6 +99,18 @@ cp .env.example .env
 - `XFYUN_ASR_ACCENT`
 - `XFYUN_ASR_VAD_EOS`
 
+如果要启用讯飞 TTS 题目播报，还需要补齐这些配置：
+- `XFYUN_TTS_APP_ID`
+- `XFYUN_TTS_API_KEY`
+- `XFYUN_TTS_API_SECRET`
+- `XFYUN_TTS_URL_HOST`
+- `XFYUN_TTS_AUTH_HOST`
+- `XFYUN_TTS_PATH`
+- `XFYUN_TTS_VCN`
+- `XFYUN_TTS_TTE`
+- `XFYUN_TTS_AUE`
+- `XFYUN_TTS_AUF`
+
 注意：
 - `.env`、`.env.local` 已被 `.gitignore` 忽略，不要提交真实密钥。
 - 如果 API Key 曾在聊天、截图或公开记录中暴露，建议立即轮换。

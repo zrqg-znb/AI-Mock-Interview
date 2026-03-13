@@ -74,7 +74,7 @@
                 }"
               >
                 <p class="portal-kpi__label" style="margin-bottom: 8px">
-                  {{ item.speaker === 'user' ? '我的回答' : '提问' }}
+                  {{ getTurnSpeakerLabel(item) }}
                 </p>
                 <div style="line-height: 1.8; white-space: pre-wrap">{{ item.content }}</div>
               </div>
@@ -115,6 +115,14 @@
             <div class="portal-list" style="margin-top: 10px">
               <n-button
                 tertiary
+                :loading="questionAudioLoading"
+                :disabled="questionAudioLoading || !currentAiSpeechText"
+                @click="playLatestAiSpeech()"
+              >
+                播放 AI 发言
+              </n-button>
+              <n-button
+                tertiary
                 :type="recognitionActive ? 'warning' : 'primary'"
                 @click="toggleRecognition"
               >
@@ -135,6 +143,7 @@
                 >结束并查看报告</n-button
               >
             </div>
+            <p class="portal-muted" style="margin-top: 14px">{{ questionAudioHint }}</p>
             <p class="portal-muted" style="margin-top: 14px">{{ recognitionHint }}</p>
           </div>
         </div>
@@ -146,7 +155,7 @@
           <div
             v-if="cameraError"
             style="
-              height: 240px;
+              height: clamp(300px, 36vw, 420px);
               display: flex;
               align-items: center;
               justify-content: center;
@@ -161,7 +170,12 @@
             autoplay
             muted
             playsinline
-            style="width: 100%; height: 240px; object-fit: cover; border-radius: 8px"
+            style="
+              width: 100%;
+              height: clamp(300px, 36vw, 420px);
+              object-fit: cover;
+              border-radius: 8px;
+            "
           ></video>
         </div>
 
@@ -171,25 +185,25 @@
             <div class="portal-panel" style="padding: 16px">
               <p class="portal-muted" style="font-size: 13px">关键词覆盖</p>
               <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
-                {{ metrics.keyword_coverage || 0 }}%
+                {{ displayMetrics.keyword_coverage || 0 }}%
               </p>
             </div>
             <div class="portal-panel" style="padding: 16px">
               <p class="portal-muted" style="font-size: 13px">专业深度</p>
               <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
-                {{ metrics.professional_depth || 0 }}
+                {{ displayMetrics.professional_depth || 0 }}
               </p>
             </div>
             <div class="portal-panel" style="padding: 16px">
               <p class="portal-muted" style="font-size: 13px">逻辑清晰度</p>
               <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
-                {{ metrics.logic_clarity || 0 }}
+                {{ displayMetrics.logic_clarity || 0 }}
               </p>
             </div>
             <div class="portal-panel" style="padding: 16px">
               <p class="portal-muted" style="font-size: 13px">录入总字数</p>
               <p class="portal-section-title" style="font-size: 24px; margin-top: 4px">
-                {{ metrics.total_words || 0 }}
+                {{ displayMetrics.total_words || 0 }}
               </p>
             </div>
           </div>
@@ -229,6 +243,7 @@
 
 <script setup>
 import api from '@/api'
+import { getToken } from '@/utils'
 
 const router = useRouter()
 const route = useRoute()
@@ -241,6 +256,8 @@ const manualText = ref('')
 const interimTranscript = ref('')
 const recognitionActive = ref(false)
 const recognitionHint = ref('点击“开始回答”启动科大讯飞语音识别。')
+const questionAudioLoading = ref(false)
+const questionAudioHint = ref('AI 发言支持语音播报。')
 const cameraError = ref('')
 const finished = ref(false)
 const askingNext = ref(false)
@@ -260,16 +277,59 @@ let stopWaitPromise = null
 let stopWaitResolve = null
 let stopWaitTimer = null
 let connectTimeoutTimer = null
+let questionAudio = null
+let questionAudioRequestId = 0
+const ASR_FRAME_BYTES = 1280
+const questionAudioCache = new Map()
 
-onMounted(async () => {
+const latestAiTurn = computed(() => {
+  const turns = [...timeline.value].reverse()
+  return turns.find((item) => item.speaker === 'ai') || null
+})
+
+const latestAiTurnKey = computed(() => {
+  const turn = latestAiTurn.value
+  if (!turn) return ''
+  return `${turn.id || ''}:${turn.created_at || ''}:${turn.source || ''}:${turn.content || ''}`
+})
+
+const currentAiSpeechText = computed(
+  () =>
+    latestAiTurn.value?.content ||
+    session.value?.current_question?.question ||
+    session.value?.opening ||
+    ''
+)
+
+const displayMetrics = computed(() => {
+  const hasInterim = Boolean(interimTranscript.value.trim())
+  if (hasInterim || recognitionActive.value) {
+    return buildPreviewMetrics()
+  }
+  return normalizeMetrics(metrics.value)
+})
+
+watch(
+  latestAiTurnKey,
+  (currentKey, previousKey) => {
+    if (!currentKey || currentKey === previousKey) return
+    void playLatestAiSpeech({ autoplay: true, suppressErrorMessage: true })
+  },
+  { flush: 'post' }
+)
+
+onMounted(() => {
   hydrateSession()
-  await setupCamera()
-  await nextTick()
-  scrollToBottom()
+  void setupCamera()
+  void nextTick(() => {
+    scrollToBottom()
+  })
 })
 
 onBeforeUnmount(() => {
   void stopRecognition({ submitTranscript: false, waitForFinalResult: false })
+  stopQuestionAudioPlayback()
+  revokeQuestionAudioCache()
   stopCamera()
 })
 
@@ -279,7 +339,7 @@ function hydrateSession() {
   const data = JSON.parse(raw)
   session.value = data
   timeline.value = data.turns || []
-  metrics.value = data.latest_metrics || {}
+  metrics.value = normalizeMetrics(data.latest_metrics || {})
   const userTurns = timeline.value.filter((item) => item.speaker === 'user')
   segmentIndex = (userTurns[userTurns.length - 1]?.segment_index || 0) + 1
 }
@@ -291,7 +351,7 @@ function persistSession() {
     JSON.stringify({
       ...session.value,
       turns: timeline.value,
-      latest_metrics: metrics.value,
+      latest_metrics: normalizeMetrics(metrics.value),
     })
   )
 }
@@ -332,9 +392,199 @@ function stopCamera() {
   mediaStream = null
 }
 
+function getTurnSpeakerLabel(item) {
+  if (item?.speaker === 'user') {
+    return '我的回答'
+  }
+  return item?.source === 'question' ? '提问' : 'AI 发言'
+}
+
+function normalizeMetrics(source = {}) {
+  return {
+    keyword_coverage: source.keyword_coverage ?? source.keyword_hit_rate ?? 0,
+    professional_depth: source.professional_depth ?? source.completeness ?? 0,
+    logic_clarity: source.logic_clarity ?? source.expression_pace ?? 0,
+    total_words: source.total_words ?? source.answer_chars ?? 0,
+  }
+}
+
+function extractTerms(text) {
+  const matches =
+    String(text || '')
+      .toLowerCase()
+      .match(/[a-z0-9+#.]{2,}|[\u4e00-\u9fff]{1,}/g) || []
+  return new Set(matches.map((item) => item.trim()).filter(Boolean))
+}
+
+function buildPreviewMetrics() {
+  const userContents = timeline.value
+    .filter((item) => item.speaker === 'user')
+    .map((item) => item.content || '')
+  const interimText = interimTranscript.value.trim()
+  if (interimText) {
+    userContents.push(interimText)
+  }
+  const userText = userContents.join(' ').trim()
+  if (!userText) {
+    return normalizeMetrics(metrics.value)
+  }
+
+  const userTerms = extractTerms(userText)
+  const mustHave = session.value?.jd?.must_have_tags || []
+  const matched = mustHave.filter((item) => {
+    const text = String(item || '').trim()
+    if (!text) return false
+    return userTerms.has(text.toLowerCase()) || userText.includes(text)
+  })
+  const totalLength = userText.length
+  const answerCount = Math.max(userContents.length, 1)
+  const keywordCoverage = mustHave.length
+    ? Math.min(100, Math.round((matched.length / mustHave.length) * 100))
+    : Math.min(95, 55 + Math.floor(totalLength / 15))
+
+  return {
+    keyword_coverage: keywordCoverage,
+    professional_depth: Math.min(100, 35 + Math.floor(totalLength / 12)),
+    logic_clarity: Math.min(100, 48 + answerCount * 9),
+    total_words: totalLength,
+  }
+}
+
+function buildApiUrl(path) {
+  const baseApi = import.meta.env.VITE_BASE_API || '/api/v1'
+  return `${baseApi}${path}`
+}
+
 function buildAsrSocketUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   return `${protocol}://${window.location.host}/api/v1/mock_interview/ws/asr`
+}
+
+function stopQuestionAudioPlayback({ hint = '', cancelPending = true } = {}) {
+  if (cancelPending) {
+    questionAudioRequestId += 1
+    questionAudioLoading.value = false
+  }
+  if (questionAudio) {
+    questionAudio.pause()
+    questionAudio.src = ''
+    questionAudio = null
+  }
+  if (hint) {
+    questionAudioHint.value = hint
+  }
+}
+
+function revokeQuestionAudioCache() {
+  for (const url of questionAudioCache.values()) {
+    URL.revokeObjectURL(url)
+  }
+  questionAudioCache.clear()
+}
+
+async function fetchQuestionAudioUrl(text) {
+  if (questionAudioCache.has(text)) {
+    return questionAudioCache.get(text)
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+  }
+  const token = getToken()
+  if (token) {
+    headers.token = token
+  }
+
+  const response = await fetch(buildApiUrl('/mock_interview/tts'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ text }),
+  })
+
+  if (!response.ok) {
+    let message = 'AI 语音生成失败，请稍后重试。'
+    const contentType = response.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const errorPayload = await response.json()
+      message = errorPayload?.detail || errorPayload?.msg || message
+    } else {
+      const textMessage = await response.text()
+      message = textMessage || message
+    }
+    throw new Error(message)
+  }
+
+  const audioBlob = await response.blob()
+  const objectUrl = URL.createObjectURL(audioBlob)
+  questionAudioCache.set(text, objectUrl)
+  return objectUrl
+}
+
+function isAutoplayBlockedError(error) {
+  return error?.name === 'NotAllowedError'
+}
+
+function isPlaybackAbortError(error) {
+  return error?.name === 'AbortError'
+}
+
+async function playLatestAiSpeech({ autoplay = false, suppressErrorMessage = false } = {}) {
+  const speechText = currentAiSpeechText.value.trim()
+  if (!speechText) {
+    questionAudioHint.value = '当前没有可播报的 AI 发言。'
+    return
+  }
+
+  const requestId = questionAudioRequestId + 1
+  questionAudioRequestId = requestId
+  stopQuestionAudioPlayback({ cancelPending: false })
+  questionAudioLoading.value = true
+  questionAudioHint.value = '正在生成 AI 语音...'
+
+  try {
+    const audioUrl = await fetchQuestionAudioUrl(speechText)
+    if (requestId !== questionAudioRequestId) {
+      return
+    }
+    const audio = new Audio(audioUrl)
+    audio.preload = 'auto'
+    questionAudio = audio
+    audio.onended = () => {
+      if (questionAudio === audio) {
+        questionAudio = null
+      }
+      questionAudioHint.value = 'AI 播报完成。'
+    }
+    audio.onerror = () => {
+      if (questionAudio === audio) {
+        questionAudio = null
+      }
+      questionAudioHint.value = 'AI 音频播放失败，请重试。'
+    }
+    await audio.play()
+    if (requestId !== questionAudioRequestId || questionAudio !== audio) {
+      audio.pause()
+      return
+    }
+    questionAudioHint.value = '正在播放 AI 语音...'
+  } catch (error) {
+    const message = error?.message || 'AI 语音生成失败，请稍后重试。'
+    const autoplayBlocked = autoplay && isAutoplayBlockedError(error)
+    if (isPlaybackAbortError(error)) {
+      return
+    }
+    stopQuestionAudioPlayback({ cancelPending: false })
+    questionAudioHint.value = autoplayBlocked
+      ? '浏览器阻止了自动播报，可点击“播放 AI 发言”重试。'
+      : message
+    if (!suppressErrorMessage && !autoplayBlocked) {
+      window.$message?.error(message)
+    }
+  } finally {
+    if (requestId === questionAudioRequestId) {
+      questionAudioLoading.value = false
+    }
+  }
 }
 
 function cleanupAudioPipeline() {
@@ -445,6 +695,17 @@ function convertFloat32ToInt16(buffer) {
   return output
 }
 
+function sendPcmFrames(pcmData) {
+  if (!pcmData?.byteLength || asrSocket?.readyState !== WebSocket.OPEN) return
+  const pcmBytes = new Uint8Array(pcmData.buffer.slice(0))
+  for (let offset = 0; offset < pcmBytes.byteLength; offset += ASR_FRAME_BYTES) {
+    const chunk = pcmBytes.slice(offset, offset + ASR_FRAME_BYTES)
+    if (chunk.byteLength) {
+      asrSocket.send(chunk.buffer)
+    }
+  }
+}
+
 async function startRecognition() {
   if (recognitionActive.value || recognitionConnecting || recognitionStopping) return
   if (!mediaStream) {
@@ -452,6 +713,7 @@ async function startRecognition() {
   }
   if (!mediaStream) return
 
+  stopQuestionAudioPlayback({ hint: 'AI 播报已暂停。' })
   cleanupAudioPipeline()
   cleanupSocket(true)
   interimTranscript.value = ''
@@ -546,7 +808,7 @@ async function startAudioProcessing() {
   await audioContext.resume()
   const inputSampleRate = audioContext.sampleRate
   sourceNode = audioContext.createMediaStreamSource(mediaStream)
-  processor = audioContext.createScriptProcessor(4096, 1, 1)
+  processor = audioContext.createScriptProcessor(2048, 1, 1)
   silentGainNode = audioContext.createGain()
   silentGainNode.gain.value = 0
 
@@ -555,7 +817,7 @@ async function startAudioProcessing() {
       return
     const pcmData = downsampleTo16k(event.inputBuffer.getChannelData(0), inputSampleRate)
     if (!pcmData.length) return
-    asrSocket.send(pcmData.buffer)
+    sendPcmFrames(pcmData)
   }
 
   sourceNode.connect(processor)
@@ -638,7 +900,7 @@ async function submitSegment(content) {
     segment_index: segmentIndex,
   })
   timeline.value.push(res.data.turn)
-  metrics.value = res.data.metrics || metrics.value
+  metrics.value = normalizeMetrics(res.data.metrics || metrics.value)
   segmentIndex += 1
   manualText.value = ''
   persistSession()
@@ -670,12 +932,18 @@ async function requestNextQuestion() {
       ...session.value,
       ...(res.data.session || {}),
       current_round: res.data.round_no,
+      current_question: {
+        question: res.data.question,
+        focus: res.data.focus,
+        stage: res.data.stage,
+      },
     }
     timeline.value.push({
       id: `ai-${Date.now()}`,
       created_at: new Date().toISOString(),
       speaker: 'ai',
       content: res.data.question,
+      source: 'question',
     })
     persistSession()
     await nextTick()
@@ -698,10 +966,11 @@ async function finishInterview() {
   try {
     const res = await api.finishMockInterview({ session_id: session.value.id })
     finished.value = true
-    const report = res.data.report
-    if (report?.id) {
-      router.push(`/ai-interview/reports/${report.id}`)
+    window.sessionStorage.removeItem(`mock-session:${session.value.id}`)
+    if (res.data?.message) {
+      window.$message?.success(res.data.message)
     }
+    router.push('/ai-interview/reports')
   } finally {
     finishing.value = false
   }

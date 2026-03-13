@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from datetime import datetime
@@ -11,12 +12,15 @@ from app.controllers.interview import interview_controller
 from app.controllers.jd import jd_controller
 from app.controllers.position import position_controller
 from app.controllers.report import report_controller
+from app.log import logger
 from app.models.interview import InterviewPosition, PositionJD
 from app.schemas.interviews import DEFAULT_SCORING_DIMENSIONS
 from app.services.interview_ai import interview_ai_adapter
 
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9+#\.]{2,}|[\u4e00-\u9fff]{1,}")
+_START_PLAN_TIMEOUT_SECONDS = 6
+_NEXT_QUESTION_TIMEOUT_SECONDS = 8
 
 
 class MockInterviewService:
@@ -145,6 +149,215 @@ class MockInterviewService:
                 score = fallback.get(name, 0)
             normalized[name] = max(0, min(100, score))
         return normalized
+
+    @staticmethod
+    def _clip_text(value: Any, max_length: int = 180) -> str:
+        text = str(value or "").strip()
+        if len(text) <= max_length:
+            return text
+        return f"{text[:max_length]}..."
+
+    def _build_transcript(self, turns: list[dict]) -> list[dict[str, Any]]:
+        transcript: list[dict[str, Any]] = []
+        for item in turns:
+            transcript.append(
+                {
+                    "round_no": item.get("round_no", 1),
+                    "speaker": item.get("speaker", ""),
+                    "source": item.get("source", ""),
+                    "content": self._safe_text(item.get("content")),
+                    "created_at": item.get("created_at"),
+                }
+            )
+        return transcript
+
+    def _build_round_reviews(self, turns: list[dict], jd: dict | None) -> list[dict[str, Any]]:
+        must_have = jd.get("must_have_tags", []) if jd else []
+        grouped: dict[int, list[dict]] = {}
+        for turn in turns:
+            round_no = int(turn.get("round_no") or 1)
+            grouped.setdefault(round_no, []).append(turn)
+
+        reviews: list[dict[str, Any]] = []
+        for round_no in sorted(grouped.keys()):
+            round_turns = grouped[round_no]
+            question_text = ""
+            ai_followups: list[str] = []
+            answer_parts: list[str] = []
+            for turn in round_turns:
+                content = self._safe_text(turn.get("content"))
+                if not content:
+                    continue
+                if turn.get("speaker") == "ai":
+                    if turn.get("source") == "question" and not question_text:
+                        question_text = content
+                    else:
+                        ai_followups.append(content)
+                elif turn.get("speaker") == "user":
+                    answer_parts.append(content)
+
+            answer_text = "\n".join(answer_parts).strip()
+            matched_keywords = [
+                item
+                for item in must_have
+                if str(item).lower() in self._extract_terms(answer_text) or str(item) in answer_text
+            ]
+            answer_length = len(answer_text)
+            depth_score = min(98, 42 + answer_length // 18 + len(matched_keywords) * 8)
+            if answer_length < 60:
+                depth_comment = "回答偏短，主要停留在结论层，还需要补动作、判断依据和结果。"
+            elif len(matched_keywords) >= 2:
+                depth_comment = "回答能覆盖岗位重点，并且带出一定过程细节，深度相对更稳定。"
+            else:
+                depth_comment = "回答有基本展开，但岗位关键词和关键决策细节还可以继续补充。"
+
+            reviews.append(
+                {
+                    "round_no": round_no,
+                    "question": question_text or (ai_followups[0] if ai_followups else ""),
+                    "answer_summary": self._clip_text(answer_text, 220),
+                    "depth_score": max(0, min(100, depth_score if answer_text else 0)),
+                    "depth_comment": depth_comment if answer_text else "本轮尚未形成有效回答。",
+                    "matched_keywords": matched_keywords[:4],
+                    "improvement": (
+                        "建议补充业务背景、你的关键动作、判断依据和量化结果。"
+                        if answer_text
+                        else "建议先围绕题目做完整回答，再进入下一题。"
+                    ),
+                    "ai_followups": ai_followups[:3],
+                }
+            )
+        return reviews
+
+    def _build_process_review(
+        self,
+        position: dict,
+        live_metrics: dict[str, Any],
+        round_reviews: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        answered_rounds = sum(1 for item in round_reviews if item.get("answer_summary"))
+        average_depth = (
+            round(sum(int(item.get("depth_score", 0)) for item in round_reviews) / len(round_reviews))
+            if round_reviews
+            else 0
+        )
+        dialogue_observations = [
+            f"共完成 {answered_rounds}/{len(round_reviews)} 轮有效作答，整体节奏较为连续。"
+            if round_reviews
+            else "当前尚未形成可回看的多轮问答。"
+        ]
+        if live_metrics.get("keyword_coverage", 0) >= 70:
+            dialogue_observations.append("回答中对岗位关键词有较明显覆盖，说明准备方向基本正确。")
+        else:
+            dialogue_observations.append("岗位关键词覆盖还不够集中，说明回答更偏经验描述，离岗位要求还可以再贴近。")
+        if average_depth >= 75:
+            depth_assessment = "大部分回答不只停留在结论层，能够进一步解释做法、依据和结果，回答深度较稳定。"
+        elif average_depth >= 55:
+            depth_assessment = "回答有一定展开，但在关键动作、数据结果和取舍判断上还缺少更扎实的细节。"
+        else:
+            depth_assessment = "回答普遍偏概括，深度主要停留在结论或职责描述，缺少足够的证据支撑。"
+
+        return {
+            "flow_summary": (
+                f"本场围绕 {position.get('title') or '目标岗位'} 展开，多轮问题主要聚焦项目经历、岗位理解和情景拆解。"
+            ),
+            "depth_assessment": depth_assessment,
+            "dialogue_observations": dialogue_observations[:3],
+            "next_focus": [
+                "每轮回答先交代背景，再说明动作、判断依据和结果。",
+                "涉及项目经历时尽量补充量化指标、时间范围和个人贡献边界。",
+                "情景题回答时先给框架，再展开优先级与风险判断。",
+            ],
+        }
+
+    def _normalize_process_review(self, value: Any, fallback: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(value, dict):
+            return fallback
+        return {
+            "flow_summary": self._safe_text(value.get("flow_summary"), fallback.get("flow_summary", "")),
+            "depth_assessment": self._safe_text(
+                value.get("depth_assessment"), fallback.get("depth_assessment", "")
+            ),
+            "dialogue_observations": self._normalize_string_list(
+                value.get("dialogue_observations"), limit=4
+            )
+            or fallback.get("dialogue_observations", []),
+            "next_focus": self._normalize_string_list(value.get("next_focus"), limit=4)
+            or fallback.get("next_focus", []),
+        }
+
+    def _normalize_round_reviews(self, value: Any, fallback: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not isinstance(value, list):
+            return fallback
+        normalized: list[dict[str, Any]] = []
+        for index, item in enumerate(value[: max(len(fallback), 5)]):
+            if not isinstance(item, dict):
+                continue
+            default = fallback[index] if index < len(fallback) else {}
+            try:
+                round_no = int(item.get("round_no") or default.get("round_no") or index + 1)
+            except (TypeError, ValueError):
+                round_no = int(default.get("round_no") or index + 1)
+            try:
+                depth_score = int(round(float(item.get("depth_score", default.get("depth_score", 0)) or 0)))
+            except (TypeError, ValueError):
+                depth_score = int(default.get("depth_score", 0) or 0)
+            normalized.append(
+                {
+                    "round_no": round_no,
+                    "question": self._safe_text(item.get("question"), default.get("question", "")),
+                    "answer_summary": self._safe_text(
+                        item.get("answer_summary"), default.get("answer_summary", "")
+                    ),
+                    "depth_score": max(0, min(100, depth_score)),
+                    "depth_comment": self._safe_text(
+                        item.get("depth_comment"), default.get("depth_comment", "")
+                    ),
+                    "matched_keywords": self._normalize_string_list(
+                        item.get("matched_keywords"), limit=4
+                    )
+                    or default.get("matched_keywords", []),
+                    "improvement": self._safe_text(
+                        item.get("improvement"), default.get("improvement", "")
+                    ),
+                    "ai_followups": self._normalize_string_list(item.get("ai_followups"), limit=3)
+                    or default.get("ai_followups", []),
+                }
+            )
+        return normalized or fallback
+
+    def _build_generating_report_payload(
+        self,
+        session: dict,
+        position: dict,
+        jd: dict | None,
+        turns: list[dict],
+    ) -> dict[str, Any]:
+        user_turns = [turn for turn in turns if turn.get("speaker") == "user"]
+        live_metrics = self.build_live_metrics(jd, user_turns)
+        round_reviews = self._build_round_reviews(turns, jd)
+        process_review = self._build_process_review(position, live_metrics, round_reviews)
+        return {
+            "total_score": 0,
+            "dimension_scores": {},
+            "overview": "报告正在生成中，系统会结合整场对话给出更完整的过程复盘和深度评价。",
+            "highlights": ["报告生成中，将自动整理你的对话亮点。"],
+            "risks": ["报告生成中，请 1 到 2 分钟后刷新查看完整内容。"],
+            "suggestions": ["报告生成完成后，这里会给出更具体的改进建议。"],
+            "recommended_positions": [position.get("title")] if position.get("title") else [],
+            "archive_status": "generating",
+            "pdf_url": f"/ai-interview/reports/session/{session.get('id')}?export=pdf",
+            "report_payload": {
+                "generation_status": "pending",
+                "queued_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "live_metrics": live_metrics,
+                "persona": session.get("ai_persona", {}),
+                "question_plan": session.get("question_plan", []),
+                "conversation_transcript": self._build_transcript(turns),
+                "round_reviews": round_reviews,
+                "process_review": process_review,
+            },
+        }
 
     def build_recommendation_reason(self, candidate: dict, position: dict, matched_tags: list[str], missing_tags: list[str], score: int):
         headline = candidate.get("headline") or candidate.get("target_position") or "候选人"
@@ -290,11 +503,16 @@ class MockInterviewService:
             "completeness": completeness,
             "expression_pace": expression_pace,
             "communication_stability": communication_stability,
+            # Keep frontend field names aligned with the room dashboard.
+            "keyword_coverage": keyword_hit_rate,
+            "professional_depth": completeness,
+            "logic_clarity": expression_pace,
+            "total_words": total_len,
             "matched_keywords": matched[:6],
             "answer_chars": total_len,
         }
 
-    async def build_next_question(self, session: dict, position: dict, jd: dict | None, turns: list[dict]):
+    def _build_next_question_fallback(self, session: dict, position: dict, jd: dict | None):
         plan = session.get("question_plan") or []
         next_index = session.get("current_round", 0) + 1
         total_rounds = session.get("total_rounds", 5)
@@ -305,13 +523,22 @@ class MockInterviewService:
         else:
             fallback_plan = self.build_fallback_question_plan({}, position, jd, total_rounds)
             question_item = fallback_plan["questions"][next_index - 1]
-        fallback_result = {
+        return {
             "completed": False,
             "round_no": next_index,
             "question": question_item.get("question"),
             "focus": question_item.get("focus"),
             "stage": question_item.get("stage"),
         }
+
+    async def build_next_question(self, session: dict, position: dict, jd: dict | None, turns: list[dict]):
+        plan = session.get("question_plan") or []
+        fallback_result = self._build_next_question_fallback(session, position, jd)
+        if fallback_result.get("completed"):
+            return fallback_result
+        next_index = fallback_result["round_no"]
+        total_rounds = session.get("total_rounds", 5)
+        question_item = plan[next_index - 1] if isinstance(plan, list) and len(plan) >= next_index else fallback_result
         if not interview_ai_adapter.enabled:
             return fallback_result
         system_prompt = (
@@ -348,6 +575,9 @@ class MockInterviewService:
     async def build_report(self, session: dict, candidate: dict, position: dict, jd: dict | None, turns: list[dict]):
         user_turns = [turn for turn in turns if turn.get("speaker") == "user"]
         live_metrics = self.build_live_metrics(jd, user_turns)
+        transcript = self._build_transcript(turns)
+        round_reviews = self._build_round_reviews(turns, jd)
+        process_review = self._build_process_review(position, live_metrics, round_reviews)
         scoring_dimensions = jd.get("scoring_dimensions") if jd else []
         dimension_names = scoring_dimensions or DEFAULT_SCORING_DIMENSIONS
         values_seed = [
@@ -398,9 +628,13 @@ class MockInterviewService:
                 "live_metrics": live_metrics,
                 "persona": session.get("ai_persona", {}),
                 "question_plan": session.get("question_plan", []),
+                "conversation_transcript": transcript,
+                "round_reviews": round_reviews,
+                "process_review": process_review,
                 "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "ai_model": interview_ai_adapter.model_name if interview_ai_adapter.enabled else "",
                 "ai_generated": False,
+                "generation_status": "completed",
             },
         }
         if interview_ai_adapter.enabled:
@@ -411,15 +645,18 @@ class MockInterviewService:
             user_prompt = (
                 '请严格返回 JSON：'
                 '{"total_score":80,"dimension_scores":{"专业能力":80},"overview":"...",'
-                '"highlights":["..."],"risks":["..."],"suggestions":["..."],"recommended_positions":["..."]}'
+                '"highlights":["..."],"risks":["..."],"suggestions":["..."],"recommended_positions":["..."],'
+                '"process_review":{"flow_summary":"...","depth_assessment":"...","dialogue_observations":["..."],"next_focus":["..."]},'
+                '"round_reviews":[{"round_no":1,"question":"...","answer_summary":"...","depth_score":80,"depth_comment":"...","matched_keywords":["..."],"improvement":"...","ai_followups":["..."]}]}'
                 f"\n评分维度请使用：{self._json_dump(dimension_names)}"
                 f"\n场次信息：{self._json_dump(session)}"
                 f"\n候选人信息：{self._json_dump(candidate)}"
                 f"\n岗位信息：{self._json_dump(position)}"
                 f"\nJD 信息：{self._json_dump(jd or {})}"
                 f"\n面试对话：{self._json_dump(turns)}"
+                f"\n轮次回看：{self._json_dump(round_reviews)}"
                 f"\n实时指标：{self._json_dump(live_metrics)}"
-                "\n要求：1. 结论要像真实面试复盘；2. 每个列表控制在 3 条以内；3. 建议要具体可执行。"
+                "\n要求：1. 结论要像真实面试复盘；2. 必须体现对话过程和回答深度；3. 每个列表控制在 3 条以内；4. 建议要具体可执行。"
             )
             ai_result = await interview_ai_adapter.generate_json(
                 system_prompt,
@@ -454,6 +691,14 @@ class MockInterviewService:
                     self._normalize_string_list(ai_result.get("recommended_positions"), limit=3)
                     or payload["recommended_positions"]
                 )
+                payload["report_payload"]["process_review"] = self._normalize_process_review(
+                    ai_result.get("process_review"),
+                    payload["report_payload"]["process_review"],
+                )
+                payload["report_payload"]["round_reviews"] = self._normalize_round_reviews(
+                    ai_result.get("round_reviews"),
+                    payload["report_payload"]["round_reviews"],
+                )
                 payload["report_payload"]["ai_generated"] = True
         return payload
 
@@ -476,8 +721,9 @@ class MockInterviewService:
             search=Q(candidate_id=candidate.id),
             order=["-created_at"],
         )
-        latest_report = await report_controller.serialize(report_objs[0]) if report_objs else None
-        all_reports = await report_controller.model.filter(candidate_id=candidate.id).all()
+        visible_report = next((item for item in report_objs if item.archive_status != "generating"), None)
+        latest_report = await report_controller.serialize(visible_report) if visible_report else None
+        all_reports = await report_controller.model.filter(candidate_id=candidate.id).exclude(archive_status="generating").all()
         average_score = round(sum(report.total_score for report in all_reports) / len(all_reports)) if all_reports else 0
         featured_positions = await self.list_recommendations(user_id=user_id, page_size=3)
         profile_fields = [
@@ -549,7 +795,17 @@ class MockInterviewService:
         candidate_data = await candidate.to_dict()
         position_data = await position.to_dict()
         jd_data = await active_jd.to_dict() if active_jd else None
-        plan = await self.build_question_plan(candidate_data, position_data, jd_data, total_rounds)
+        try:
+            plan = await asyncio.wait_for(
+                self.build_question_plan(candidate_data, position_data, jd_data, total_rounds),
+                timeout=_START_PLAN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "mock interview start plan timed out after {}s, fallback plan will be used",
+                _START_PLAN_TIMEOUT_SECONDS,
+            )
+            plan = self.build_fallback_question_plan(candidate_data, position_data, jd_data, total_rounds)
         session = await interview_controller.create_session(
             obj_in={
                 "candidate_id": candidate.id,
@@ -626,12 +882,20 @@ class MockInterviewService:
         turns = [await interview_controller.serialize_turn(item) for item in await interview_controller.get_turns(session.id)]
         position = await position_controller.get(id=session.position_id)
         jd = await jd_controller.get(id=session.jd_id) if session.jd_id else None
-        result = await self.build_next_question(
-            await session.to_dict(),
-            await position.to_dict(),
-            await jd.to_dict() if jd else None,
-            turns,
-        )
+        session_data = await session.to_dict()
+        position_data = await position.to_dict()
+        jd_data = await jd.to_dict() if jd else None
+        try:
+            result = await asyncio.wait_for(
+                self.build_next_question(session_data, position_data, jd_data, turns),
+                timeout=_NEXT_QUESTION_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "mock interview next question timed out after {}s, fallback question will be used",
+                _NEXT_QUESTION_TIMEOUT_SECONDS,
+            )
+            result = self._build_next_question_fallback(session_data, position_data, jd_data)
         if result.get("completed"):
             return result
         await interview_controller.update(
@@ -656,32 +920,87 @@ class MockInterviewService:
         session = await interview_controller.get(id=session_id)
         if session.user_id != user_id:
             raise HTTPException(status_code=403, detail="无权结束该场次")
-        candidate = await candidate_controller.get(id=session.candidate_id)
         position = await position_controller.get(id=session.position_id)
         jd = await jd_controller.get(id=session.jd_id) if session.jd_id else None
         turns = [await interview_controller.serialize_turn(item) for item in await interview_controller.get_turns(session.id)]
-        report_payload = await self.build_report(
-            await session.to_dict(),
-            await candidate.to_dict(),
-            await position.to_dict(),
-            await jd.to_dict() if jd else None,
-            turns,
-        )
-        report_payload["pdf_url"] = f"/ai-interview/reports/session/{session.id}?export=pdf"
-        report = await report_controller.upsert_by_session(session, report_payload)
+        session_data = await session.to_dict()
+        position_data = await position.to_dict()
+        jd_data = await jd.to_dict() if jd else None
+        current_report = await report_controller.get_by_session_id(session.id)
+
+        should_generate_report = True
+        if current_report and current_report.archive_status not in {"generating", "draft"}:
+            should_generate_report = False
+            report = current_report
+        else:
+            placeholder_payload = self._build_generating_report_payload(session_data, position_data, jd_data, turns)
+            report = await report_controller.upsert_by_session(session, placeholder_payload)
+            if current_report and current_report.archive_status == "generating":
+                should_generate_report = False
+
+        live_metrics = self.build_live_metrics(jd_data, [turn for turn in turns if turn.get("speaker") == "user"])
         await interview_controller.update(
             id=session.id,
             obj_in={
                 "status": "completed",
                 "ended_at": datetime.now(),
-                "latest_metrics": report_payload.get("report_payload", {}).get("live_metrics", {}),
+                "latest_metrics": live_metrics,
             },
         )
         updated_session = await interview_controller.get(id=session.id)
         return {
             "session": await interview_controller.serialize(updated_session),
             "report": await report_controller.serialize(report),
+            "report_pending": should_generate_report or (current_report is not None and current_report.archive_status == "generating"),
+            "message": "练习已结束，报告正在生成中，请 1 到 2 分钟后到报告中心查看。"
+            if should_generate_report or (current_report is not None and current_report.archive_status == "generating")
+            else "练习已结束，报告已生成完成。",
+            "_should_generate_report": should_generate_report,
         }
+
+    async def generate_report_for_session(self, session_id: int):
+        session = await interview_controller.get(id=session_id)
+        candidate = await candidate_controller.get(id=session.candidate_id)
+        position = await position_controller.get(id=session.position_id)
+        jd = await jd_controller.get(id=session.jd_id) if session.jd_id else None
+        turns = [await interview_controller.serialize_turn(item) for item in await interview_controller.get_turns(session.id)]
+        current_report = await report_controller.get_by_session_id(session.id)
+
+        try:
+            report_payload = await self.build_report(
+                await session.to_dict(),
+                await candidate.to_dict(),
+                await position.to_dict(),
+                await jd.to_dict() if jd else None,
+                turns,
+            )
+            report_payload["pdf_url"] = f"/ai-interview/reports/session/{session.id}?export=pdf"
+            existing_payload = current_report.report_payload if current_report else {}
+            report_payload["report_payload"] = {
+                **(existing_payload or {}),
+                **report_payload.get("report_payload", {}),
+                "queued_at": (existing_payload or {}).get("queued_at"),
+                "generation_status": "completed",
+                "completed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            await report_controller.upsert_by_session(session, report_payload)
+            await interview_controller.update(
+                id=session.id,
+                obj_in={"latest_metrics": report_payload["report_payload"].get("live_metrics", {})},
+            )
+        except Exception as exc:  # pragma: no cover - background task defensive branch
+            logger.exception("mock interview report generation failed for session {}: {}", session_id, exc)
+            failure_payload = {
+                "overview": "报告生成失败，请稍后重新进入报告中心查看，或联系管理员排查。",
+                "archive_status": "draft",
+                "report_payload": {
+                    **((current_report.report_payload if current_report else {}) or {}),
+                    "generation_status": "failed",
+                    "error_message": self._clip_text(exc, 220),
+                    "failed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            }
+            await report_controller.upsert_by_session(session, failure_payload)
 
     async def get_report(self, user_id: int, report_id: int | None = None, session_id: int | None = None):
         report = None

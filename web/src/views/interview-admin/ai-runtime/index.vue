@@ -24,38 +24,104 @@
     </template>
 
     <div class="interview-admin-table__content ai-runtime-page">
-      <div class="runtime-grid">
-        <div class="runtime-card">
-          <p class="runtime-card__label">当前状态</p>
-          <div class="runtime-card__value-row">
-            <strong class="runtime-card__value">{{ status.enabled ? '已启用' : '未启用' }}</strong>
-            <n-tag :bordered="false" :type="status.enabled ? 'success' : 'warning'">
-              {{ status.enabled ? '可调用' : '待配置' }}
+      <div class="runtime-overview">
+        <div class="runtime-highlight">
+          <div class="runtime-highlight__head">
+            <div>
+              <p class="runtime-card__label">运行总览</p>
+              <h3 class="runtime-highlight__title">{{ status.provider || '未识别服务商' }}</h3>
+              <p class="runtime-card__desc">
+                当前主模型为 {{ status.model_name || '-' }}，基础地址为
+                {{ status.base_url || '-' }}。
+              </p>
+            </div>
+            <n-tag :bordered="false" size="large" :type="status.enabled ? 'success' : 'warning'">
+              {{ status.enabled ? '当前可调用' : '待补齐配置' }}
             </n-tag>
           </div>
-          <p class="runtime-card__desc">
-            只要接口地址、模型名和密钥都已配置，就会在这里显示可调用。
-          </p>
+
+          <div class="runtime-highlight__metrics">
+            <div class="runtime-highlight__metric">
+              <span class="runtime-highlight__metric-label">最近事件</span>
+              <strong class="runtime-highlight__metric-value">
+                {{ status.last_event_at || '暂无记录' }}
+              </strong>
+            </div>
+            <div class="runtime-highlight__metric">
+              <span class="runtime-highlight__metric-label">环境文件</span>
+              <strong class="runtime-highlight__metric-value">
+                {{ (status.env_files || []).join(' / ') || '未检测到' }}
+              </strong>
+            </div>
+            <div class="runtime-highlight__metric">
+              <span class="runtime-highlight__metric-label">可用链路</span>
+              <strong class="runtime-highlight__metric-value">
+                {{ serviceCards.filter((item) => item.enabled).length }}/{{
+                  serviceCards.length || 0
+                }}
+              </strong>
+            </div>
+          </div>
         </div>
 
-        <div class="runtime-card">
-          <p class="runtime-card__label">服务商</p>
-          <strong class="runtime-card__value">{{ status.provider || '-' }}</strong>
-          <p class="runtime-card__desc">当前模型：{{ status.model_name || '-' }}</p>
-        </div>
+        <div class="runtime-mini-grid">
+          <div class="runtime-mini-card">
+            <p class="runtime-card__label">当前状态</p>
+            <strong class="runtime-card__value">{{ status.enabled ? '已启用' : '未启用' }}</strong>
+            <p class="runtime-card__desc">模型地址、模型名和密钥都完整时可调用。</p>
+          </div>
 
-        <div class="runtime-card">
-          <p class="runtime-card__label">超时设置</p>
-          <strong class="runtime-card__value">{{ status.timeout_seconds || 0 }}s</strong>
-          <p class="runtime-card__desc">用于题目生成、下一题追问和报告生成的单次请求超时。</p>
-        </div>
+          <div class="runtime-mini-card">
+            <p class="runtime-card__label">超时设置</p>
+            <strong class="runtime-card__value">{{ status.timeout_seconds || 0 }}s</strong>
+            <p class="runtime-card__desc">用于题目生成、追问生成和报告生成。</p>
+          </div>
 
-        <div class="runtime-card">
-          <p class="runtime-card__label">最近成功</p>
-          <strong class="runtime-card__value runtime-card__value--small">{{
-            status.last_success_at || '暂无记录'
-          }}</strong>
-          <p class="runtime-card__desc">如果近期没有成功记录，可以先执行一次连通测试。</p>
+          <div class="runtime-mini-card">
+            <p class="runtime-card__label">最近成功</p>
+            <strong class="runtime-card__value runtime-card__value--small">
+              {{ status.last_success_at || '暂无记录' }}
+            </strong>
+            <p class="runtime-card__desc">没有成功记录时建议先执行连通测试。</p>
+          </div>
+
+          <div class="runtime-mini-card">
+            <p class="runtime-card__label">最近异常</p>
+            <strong class="runtime-card__value runtime-card__value--small">
+              {{ status.last_error_at || '暂无异常' }}
+            </strong>
+            <p class="runtime-card__desc">最近一次非 success 事件的时间点。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="runtime-panel">
+        <div class="runtime-panel__head">
+          <div>
+            <h3 class="runtime-panel__title">模型与语音链路</h3>
+            <p class="runtime-panel__desc">
+              这里分别展示面试生成模型、讯飞 ASR、讯飞 TTS
+              的当前配置状态，便于确认星火/讯飞链路是否完整。
+            </p>
+          </div>
+        </div>
+        <div class="runtime-service-grid">
+          <div v-for="item in serviceCards" :key="item.key" class="runtime-service-card">
+            <div class="runtime-card__value-row">
+              <div>
+                <p class="runtime-card__label">{{ item.name }}</p>
+                <strong class="runtime-card__value runtime-card__value--small">
+                  {{ item.model_name || '-' }}
+                </strong>
+              </div>
+              <n-tag :bordered="false" :type="item.enabled ? 'success' : 'warning'">
+                {{ item.status_text }}
+              </n-tag>
+            </div>
+            <p class="runtime-card__desc">服务商：{{ item.provider || '-' }}</p>
+            <p class="runtime-card__desc">配置：{{ item.detail || '-' }}</p>
+            <p class="runtime-card__desc">最近成功：{{ item.last_success_at || '暂无记录' }}</p>
+          </div>
         </div>
       </div>
 
@@ -149,7 +215,7 @@
 </template>
 
 <script setup>
-import { NButton, NDataTable, NEmpty, NTag } from 'naive-ui'
+import { NAlert, NButton, NDataTable, NEmpty, NTag } from 'naive-ui'
 import api from '@/api'
 
 defineOptions({ name: 'AI运行状态' })
@@ -160,6 +226,7 @@ const status = ref({ recent_logs: [] })
 
 const latestGenerationLog = computed(() => status.value.latest_generation_log || null)
 const latestRuntimeCheck = computed(() => status.value.latest_runtime_check || null)
+const serviceCards = computed(() => status.value.service_cards || [])
 
 const columns = [
   {
@@ -226,9 +293,9 @@ async function runCheck() {
   try {
     const res = await api.runAIRuntimeCheck()
     if (res.data?.ok) {
-      $message.success('连通测试成功')
+      window.$message?.success('连通测试成功')
     } else {
-      $message.warning(res.data?.message || '连通测试未返回有效结果')
+      window.$message?.warning(res.data?.message || '连通测试未返回有效结果')
     }
     await loadStatus()
   } finally {
@@ -240,25 +307,116 @@ async function runCheck() {
 <style scoped src="../shared.css"></style>
 <style scoped>
 .ai-runtime-page {
+  display: flex;
+  flex-direction: column;
   gap: 20px;
+  min-width: 0;
+}
+
+.runtime-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.runtime-highlight {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #e7d6c6;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #fffdf9 0%, #f6ede3 100%);
+  box-shadow: 0 16px 36px rgba(92, 69, 47, 0.08);
+}
+
+.runtime-highlight__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.runtime-highlight__title {
+  margin: 12px 0 0;
+  color: #302822;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.runtime-highlight__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.runtime-highlight__metric {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(141, 108, 79, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.runtime-highlight__metric-label {
+  display: block;
+  color: #8a7564;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.runtime-highlight__metric-value {
+  display: block;
+  margin-top: 8px;
+  color: #352c25;
+  font-size: 16px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.runtime-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.runtime-mini-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid #eadfd4;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(92, 69, 47, 0.05);
 }
 
 .runtime-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
+  align-items: stretch;
 }
 
 .runtime-grid--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.runtime-service-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .runtime-card,
-.runtime-panel {
+.runtime-panel,
+.runtime-service-card {
+  min-width: 0;
   padding: 20px;
   border: 1px solid #eadfd4;
   border-radius: 20px;
   background: #fff;
+  box-shadow: 0 12px 28px rgba(92, 69, 47, 0.05);
 }
 
 .runtime-card__label,
@@ -288,6 +446,7 @@ async function runCheck() {
 
 .runtime-card__value--small {
   font-size: 18px;
+  word-break: break-word;
 }
 
 .runtime-card__desc,
@@ -336,11 +495,14 @@ async function runCheck() {
 .runtime-field__value {
   color: #3f342c;
   text-align: right;
+  max-width: 100%;
+  word-break: break-word;
 }
 
 .runtime-field__value--mono {
   font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
   font-size: 12px;
+  word-break: break-all;
 }
 
 .runtime-check-note {
@@ -366,9 +528,26 @@ async function runCheck() {
 }
 
 @media (max-width: 1100px) {
+  .runtime-overview,
   .runtime-grid,
-  .runtime-grid--two {
+  .runtime-grid--two,
+  .runtime-service-grid {
     grid-template-columns: 1fr;
+  }
+
+  .runtime-highlight__metrics,
+  .runtime-mini-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .runtime-highlight {
+    padding: 20px;
+  }
+
+  .runtime-highlight__title {
+    font-size: 28px;
   }
 }
 </style>

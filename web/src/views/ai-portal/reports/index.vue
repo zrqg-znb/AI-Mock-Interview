@@ -15,23 +15,33 @@
       </div>
     </div>
 
-    <div class="portal-grid cols-3">
+    <div class="cols-3 portal-grid">
       <div v-for="item in reports" :key="item.id" class="portal-card">
         <div class="portal-row" style="align-items: flex-start">
           <div>
             <p class="portal-chip">{{ item.position?.title || '练习岗位' }}</p>
             <h2 class="portal-section-title" style="font-size: 30px; margin-top: 14px">
-              {{ item.total_score }} 分
+              {{ item.archive_status === 'generating' ? '生成中' : `${item.total_score} 分` }}
             </h2>
             <p class="portal-section-subtitle">{{ formatDateTime(item.created_at) }}</p>
           </div>
-          <n-tag :type="scoreTone(item.total_score)" :bordered="false">{{
-            item.archive_status || 'archived'
-          }}</n-tag>
+          <n-tag
+            :type="item.archive_status === 'generating' ? 'warning' : scoreTone(item.total_score)"
+            :bordered="false"
+          >
+            {{ reportStatusText(item.archive_status) }}
+          </n-tag>
         </div>
 
         <p class="portal-section-subtitle" style="margin-top: 16px">
-          {{ compactText(item.overview, 96) }}
+          {{
+            compactText(
+              item.archive_status === 'generating'
+                ? '报告正在生成中，系统会继续整理整场对话和深度评价，请稍后刷新查看。'
+                : item.overview,
+              96
+            )
+          }}
         </p>
 
         <div class="portal-divider" style="margin: 18px 0"></div>
@@ -51,12 +61,12 @@
         </div>
 
         <div class="portal-row" style="margin-top: 18px">
-          <n-button tertiary @click="router.push(`/ai-interview/reports/${item.id}`)"
-            >查看详情</n-button
-          >
-          <n-button type="primary" @click="router.push(`/ai-interview/reports/${item.id}`)"
-            >打开报告</n-button
-          >
+          <n-button tertiary @click="router.push(`/ai-interview/reports/${item.id}`)">{{
+            item.archive_status === 'generating' ? '查看进度' : '查看详情'
+          }}</n-button>
+          <n-button type="primary" @click="router.push(`/ai-interview/reports/${item.id}`)">{{
+            item.archive_status === 'generating' ? '继续等待' : '打开报告'
+          }}</n-button>
         </div>
       </div>
     </div>
@@ -86,5 +96,12 @@ onMounted(loadData)
 async function loadData() {
   const res = await api.getCandidatePortalReports({ page: 1, page_size: 12 })
   reports.value = res.data || []
+}
+
+function reportStatusText(status) {
+  if (status === 'generating') return '生成中'
+  if (status === 'exported') return '已导出'
+  if (status === 'draft') return '草稿'
+  return '已归档'
 }
 </script>

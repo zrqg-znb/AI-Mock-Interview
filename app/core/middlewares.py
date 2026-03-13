@@ -54,6 +54,30 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
         self.audit_log_paths = ["/api/v1/auditlog/list"]
         self.max_body_size = 1024 * 1024  # 1MB 响应体大小限制
 
+    @staticmethod
+    def _normalize_content_type(content_type: str | None) -> str:
+        return (content_type or "").split(";", 1)[0].strip().lower()
+
+    def _is_json_response(self, response: Response) -> bool:
+        content_type = self._normalize_content_type(response.headers.get("content-type"))
+        return content_type == "application/json" or content_type.endswith("+json")
+
+    def _is_text_response(self, response: Response) -> bool:
+        content_type = self._normalize_content_type(response.headers.get("content-type"))
+        return content_type.startswith("text/") or content_type in {
+            "application/xml",
+            "application/javascript",
+            "application/x-www-form-urlencoded",
+        }
+
+    def _build_binary_log_payload(self, response: Response, body: bytes) -> dict[str, Any]:
+        return {
+            "content_type": self._normalize_content_type(response.headers.get("content-type"))
+            or "application/octet-stream",
+            "content_length": len(body),
+            "detail": "binary response omitted from audit log",
+        }
+
     async def get_request_args(self, request: Request) -> dict:
         args = {}
         # 获取查询参数
@@ -112,7 +136,14 @@ class HttpAuditLogMiddleware(BaseHTTPMiddleware):
             except Exception:
                 return None
 
-        return self.lenient_json(body)
+        if self._is_json_response(response):
+            parsed = self.lenient_json(body)
+            return parsed if not isinstance(parsed, bytes) else None
+
+        if self._is_text_response(response):
+            return body.decode(getattr(response, "charset", "utf-8") or "utf-8", errors="replace")
+
+        return self._build_binary_log_payload(response, body)
 
     def lenient_json(self, v: Any) -> Any:
         if isinstance(v, (str, bytes)):

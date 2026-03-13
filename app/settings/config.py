@@ -66,6 +66,22 @@ class Settings(BaseSettings):
     XFYUN_ASR_LANGUAGE: str = Field(default="zh_cn")
     XFYUN_ASR_ACCENT: str = Field(default="mandarin")
     XFYUN_ASR_VAD_EOS: int = Field(default=10000)
+    XFYUN_TTS_APP_ID: str = Field(
+        default="",
+        validation_alias=AliasChoices("XFYUN_TTS_APP_ID", "XFYUN_TTS_APPID"),
+    )
+    XFYUN_TTS_API_KEY: str = Field(default="", validation_alias=AliasChoices("XFYUN_TTS_API_KEY", "XFYUN_TTS_KEY"))
+    XFYUN_TTS_API_SECRET: str = Field(
+        default="",
+        validation_alias=AliasChoices("XFYUN_TTS_API_SECRET", "XFYUN_TTS_SECRET"),
+    )
+    XFYUN_TTS_URL_HOST: str = Field(default="tts-api.xfyun.cn")
+    XFYUN_TTS_AUTH_HOST: str = Field(default="ws-api.xfyun.cn")
+    XFYUN_TTS_PATH: str = Field(default="/v2/tts")
+    XFYUN_TTS_VCN: str = Field(default="x4_yezi")
+    XFYUN_TTS_TTE: str = Field(default="utf8")
+    XFYUN_TTS_AUE: str = Field(default="raw")
+    XFYUN_TTS_AUF: str = Field(default="audio/L16;rate=16000")
     DATETIME_FORMAT: str = "%Y-%m-%d %H:%M:%S"
 
     @property

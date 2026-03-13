@@ -25,6 +25,7 @@ export const sessionStatusOptions = [
 ]
 
 export const archiveStatusOptions = [
+  { label: '生成中', value: 'generating' },
   { label: '已归档', value: 'archived' },
   { label: '草稿', value: 'draft' },
   { label: '已导出', value: 'exported' },

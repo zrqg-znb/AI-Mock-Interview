@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Query
 
+from app.core.bgtask import BgTasks
 from app.core.ctx import CTX_USER_ID
 from app.core.dependency import DependAuth
 from app.schemas.base import Success
@@ -39,10 +40,12 @@ async def next_question(payload: NextInterviewQuestionIn):
     return Success(data=data)
 
 
-@router.post('/finish', summary='结束模拟面试并生成报告')
+@router.post('/finish', summary='结束模拟面试并异步生成报告')
 async def finish_mock_interview(payload: FinishMockInterviewIn):
     user_id = CTX_USER_ID.get()
     data = await mock_interview_service.finish_interview(user_id=user_id, session_id=payload.session_id)
+    if data.pop("_should_generate_report", False):
+        await BgTasks.add_task(mock_interview_service.generate_report_for_session, payload.session_id)
     return Success(data=data)
 
 

@@ -34,10 +34,68 @@ class AIRuntimeService:
         return f"{secret[:4]}{'*' * max(len(secret) - 8, 4)}{secret[-4:]}"
 
     def _provider_name(self) -> str:
+        combined = f"{settings.AI_BASE_URL or ''} {settings.AI_MODEL_NAME or ''}".lower()
+        if any(keyword in combined for keyword in ("spark", "xfyun", "xinghuo", "讯飞")):
+            return "讯飞星火"
         base_url = (settings.AI_BASE_URL or "").lower()
         if "deepseek" in base_url:
             return "DeepSeek"
+        if "openai" in base_url:
+            return "OpenAI"
         return "Custom"
+
+    @staticmethod
+    def _is_configured(*values: str) -> bool:
+        return all(bool(str(value or "").strip()) for value in values)
+
+    def _build_service_cards(self, logs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        generation_logs = [item for item in logs if item.get("scenario") in GENERATION_SCENARIOS]
+        last_generation_success = next((item for item in generation_logs if item.get("status") == "success"), None)
+        last_generation_error = next((item for item in generation_logs if item.get("status") != "success"), None)
+
+        llm_enabled = self._is_configured(settings.AI_API_KEY, settings.AI_BASE_URL, settings.AI_MODEL_NAME)
+        asr_enabled = self._is_configured(settings.XFYUN_APP_ID, settings.XFYUN_API_KEY, settings.XFYUN_API_SECRET)
+        tts_enabled = self._is_configured(
+            settings.XFYUN_TTS_APP_ID or settings.XFYUN_APP_ID,
+            settings.XFYUN_TTS_API_KEY or settings.XFYUN_API_KEY,
+            settings.XFYUN_TTS_API_SECRET or settings.XFYUN_API_SECRET,
+        )
+
+        return [
+            {
+                "key": "interview_llm",
+                "name": "面试生成模型",
+                "provider": self._provider_name(),
+                "model_name": settings.AI_MODEL_NAME or "-",
+                "enabled": llm_enabled,
+                "status_text": "已启用" if llm_enabled else "未配置",
+                "detail": settings.AI_BASE_URL or "-",
+                "last_success_at": last_generation_success.get("timestamp") if last_generation_success else None,
+                "last_error_at": last_generation_error.get("timestamp") if last_generation_error else None,
+            },
+            {
+                "key": "xfyun_asr",
+                "name": "讯飞 ASR",
+                "provider": "科大讯飞",
+                "model_name": settings.XFYUN_ASR_DOMAIN or "iat",
+                "enabled": asr_enabled,
+                "status_text": "已启用" if asr_enabled else "未配置",
+                "detail": f"{settings.XFYUN_ASR_LANGUAGE}/{settings.XFYUN_ASR_ACCENT} @ {settings.XFYUN_ASR_HOST}",
+                "last_success_at": None,
+                "last_error_at": None,
+            },
+            {
+                "key": "xfyun_tts",
+                "name": "讯飞 TTS",
+                "provider": "科大讯飞",
+                "model_name": settings.XFYUN_TTS_VCN or "-",
+                "enabled": tts_enabled,
+                "status_text": "已启用" if tts_enabled else "未配置",
+                "detail": f"{settings.XFYUN_TTS_VCN or '-'} @ {settings.XFYUN_TTS_URL_HOST}",
+                "last_success_at": None,
+                "last_error_at": None,
+            },
+        ]
 
     def _env_files(self) -> list[str]:
         env_files: list[str] = []
@@ -92,6 +150,7 @@ class AIRuntimeService:
         last_error = next((item for item in logs if item.get("status") != "success"), None)
         latest_generation_log = next((item for item in logs if item.get("scenario") in GENERATION_SCENARIOS), None)
         latest_runtime_check = next((item for item in logs if item.get("scenario") == "runtime_check"), None)
+        service_cards = self._build_service_cards(logs)
         return {
             "enabled": bool(settings.AI_API_KEY and settings.AI_BASE_URL and settings.AI_MODEL_NAME),
             "provider": self._provider_name(),
@@ -106,6 +165,7 @@ class AIRuntimeService:
             "last_error_at": last_error.get("timestamp") if last_error else None,
             "latest_generation_log": latest_generation_log,
             "latest_runtime_check": latest_runtime_check,
+            "service_cards": service_cards,
             "recent_logs": logs,
         }
 

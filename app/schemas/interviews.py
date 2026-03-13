@@ -237,6 +237,10 @@ class FinishMockInterviewIn(BaseModel):
     session_id: int
 
 
+class MockInterviewTTSIn(BaseModel):
+    text: str = Field(min_length=1, max_length=1000)
+
+
 class CandidateDashboardOut(BaseModel):
     profile_ready: bool
     readiness_score: int

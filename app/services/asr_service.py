@@ -13,6 +13,8 @@ from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
 
 import websockets
+from websockets.exceptions import ConnectionClosedOK
+
 from app.log import logger
 
 
@@ -114,6 +116,12 @@ class iFlytekASRService:
                         await ws.send(json.dumps(frame))
                         status = 1
                     await ws.send(json.dumps(self._build_last_frame()))
+                except ConnectionClosedOK as exc:
+                    if self._is_server_read_timeout(exc):
+                        logger.info("XFYun ASR upstream closed after read timeout; ending current stream gracefully")
+                        return
+                    await queue.put(exc)
+                    raise
                 except Exception as exc:  # pragma: no cover - defensive branch for socket lifecycle
                     await queue.put(exc)
                     raise
@@ -133,6 +141,13 @@ class iFlytekASRService:
 
                         if payload.get("data", {}).get("status") == 2:
                             break
+                except ConnectionClosedOK as exc:
+                    if self._is_server_read_timeout(exc):
+                        final_text = "".join(segments[idx] for idx in sorted(segments.keys()))
+                        if final_text:
+                            await queue.put(ASRStreamEvent(text=final_text, delta="", is_final=True))
+                    else:
+                        await queue.put(exc)
                 except Exception as exc:
                     await queue.put(exc)
                 finally:
@@ -215,3 +230,8 @@ class iFlytekASRService:
             return int(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             return default
+
+    @staticmethod
+    def _is_server_read_timeout(exc: ConnectionClosedOK) -> bool:
+        reason = getattr(exc, "reason", "") or str(exc)
+        return "server read msg timeout" in reason.lower()
