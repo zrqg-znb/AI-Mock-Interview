@@ -408,4 +408,37 @@ async function handleUserAction(key) {
     overflow-x: auto;
   }
 }
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .portal-shell {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    background: #ffffff;
+  }
+
+  .portal-header {
+    display: none;
+  }
+
+  .portal-main {
+    flex: none;
+    height: auto;
+    min-height: auto;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .portal-hero,
+  .portal-card,
+  .portal-panel {
+    box-shadow: none;
+  }
+}
 </style>
