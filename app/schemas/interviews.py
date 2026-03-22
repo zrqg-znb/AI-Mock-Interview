@@ -237,6 +237,11 @@ class FinishMockInterviewIn(BaseModel):
     session_id: int
 
 
+class SubmitExpressionFrameIn(BaseModel):
+    session_id: int = Field(..., description="场次ID")
+    image_base64: str = Field(..., description="Base64 格式的图片数据")
+
+
 class MockInterviewTTSIn(BaseModel):
     text: str = Field(min_length=1, max_length=1000)
 

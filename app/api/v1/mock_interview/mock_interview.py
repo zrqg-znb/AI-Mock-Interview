@@ -4,7 +4,7 @@ from app.core.bgtask import BgTasks
 from app.core.ctx import CTX_USER_ID
 from app.core.dependency import DependAuth
 from app.schemas.base import Success
-from app.schemas.interviews import FinishMockInterviewIn, NextInterviewQuestionIn, StartMockInterviewIn, SubmitInterviewSegmentIn
+from app.schemas.interviews import FinishMockInterviewIn, NextInterviewQuestionIn, StartMockInterviewIn, SubmitInterviewSegmentIn, SubmitExpressionFrameIn
 from app.services.mock_interview import mock_interview_service
 
 router = APIRouter(dependencies=[DependAuth])
@@ -31,6 +31,19 @@ async def submit_segment(payload: SubmitInterviewSegmentIn):
         segment_index=payload.segment_index,
     )
     return Success(data=data)
+
+
+@router.post('/submit_expression_frame', summary='提交面试过程表情帧')
+async def submit_expression_frame(payload: SubmitExpressionFrameIn):
+    user_id = CTX_USER_ID.get()
+    # We use a background task for this so we don't block the API response
+    await BgTasks.add_task(
+        mock_interview_service.submit_expression_frame,
+        user_id=user_id,
+        session_id=payload.session_id,
+        image_base64=payload.image_base64,
+    )
+    return Success(data={"status": "queued"})
 
 
 @router.post('/next_question', summary='获取下一道面试题')

@@ -177,6 +177,8 @@
               border-radius: 8px;
             "
           ></video>
+          <!-- 隐藏的 canvas 用于截帧 -->
+          <canvas ref="canvasRef" style="display: none"></canvas>
         </div>
 
         <div style="margin-top: 24px">
@@ -248,6 +250,7 @@ import { getToken } from '@/utils'
 const router = useRouter()
 const route = useRoute()
 const videoRef = ref(null)
+const canvasRef = ref(null)
 const timelineRef = ref(null)
 const session = ref(null)
 const timeline = ref([])
@@ -279,6 +282,7 @@ let stopWaitTimer = null
 let connectTimeoutTimer = null
 let questionAudio = null
 let questionAudioRequestId = 0
+let expressionTimer = null
 const ASR_FRAME_BYTES = 1280
 const questionAudioCache = new Map()
 
@@ -321,6 +325,7 @@ watch(
 onMounted(() => {
   hydrateSession()
   void setupCamera()
+  startExpressionCapture()
   void nextTick(() => {
     scrollToBottom()
   })
@@ -331,6 +336,7 @@ onBeforeUnmount(() => {
   stopQuestionAudioPlayback()
   revokeQuestionAudioCache()
   stopCamera()
+  stopExpressionCapture()
 })
 
 function hydrateSession() {
@@ -390,6 +396,54 @@ function stopCamera() {
   if (!mediaStream) return
   mediaStream.getTracks().forEach((track) => track.stop())
   mediaStream = null
+}
+
+function startExpressionCapture() {
+  stopExpressionCapture()
+  // Capture every 10 seconds
+  expressionTimer = window.setInterval(captureAndSubmitExpression, 10000)
+}
+
+function stopExpressionCapture() {
+  if (expressionTimer) {
+    window.clearInterval(expressionTimer)
+    expressionTimer = null
+  }
+}
+
+async function captureAndSubmitExpression() {
+  if (finished.value || !session.value?.id) return
+  if (!videoRef.value || !canvasRef.value || !mediaStream) return
+
+  const video = videoRef.value
+  const canvas = canvasRef.value
+  
+  if (video.videoWidth === 0 || video.videoHeight === 0) return
+
+  try {
+    const ctx = canvas.getContext('2d')
+    // Resize to a smaller dimension to save bandwidth and backend processing
+    const targetWidth = 320
+    const targetHeight = (video.videoHeight / video.videoWidth) * targetWidth
+    
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    
+    ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
+    
+    // Convert to base64, quality 0.6
+    const base64Image = canvas.toDataURL('image/jpeg', 0.6)
+    
+    // Do not block or await here, just fire and forget
+    api.submitExpressionFrame({
+      session_id: session.value.id,
+      image_base64: base64Image
+    }).catch(err => {
+      console.warn('Failed to submit expression frame:', err)
+    })
+  } catch (err) {
+    console.warn('Failed to capture video frame:', err)
+  }
 }
 
 function getTurnSpeakerLabel(item) {

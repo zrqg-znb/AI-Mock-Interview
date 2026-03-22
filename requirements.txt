@@ -30,6 +30,10 @@ mypy-extensions==1.0.0
 orjson==3.10.14
 packaging==24.2
 passlib==1.7.4
+bcrypt==4.2.0
+deepface==0.0.93
+opencv-python-headless==4.10.0.84
+tf-keras==2.18.0
 pathspec==0.12.1
 platformdirs==4.3.6
 pycparser==2.22

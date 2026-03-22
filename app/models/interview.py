@@ -67,6 +67,7 @@ class InterviewSession(BaseModel, TimestampMixin):
     context_summary = fields.TextField(null=True, description="上下文摘要")
     ai_persona = fields.JSONField(default=dict, description="AI面试官人格")
     latest_metrics = fields.JSONField(default=dict, description="实时指标")
+    expression_records = fields.JSONField(default=list, description="表情记录列表")
 
     class Meta:
         table = "interview_session"

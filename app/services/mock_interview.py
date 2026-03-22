@@ -16,6 +16,7 @@ from app.log import logger
 from app.models.interview import InterviewPosition, PositionJD
 from app.schemas.interviews import DEFAULT_SCORING_DIMENSIONS
 from app.services.interview_ai import interview_ai_adapter
+from app.services.expression_service import expression_service
 
 
 _WORD_PATTERN = re.compile(r"[A-Za-z0-9+#\.]{2,}|[\u4e00-\u9fff]{1,}")
@@ -578,6 +579,22 @@ class MockInterviewService:
         transcript = self._build_transcript(turns)
         round_reviews = self._build_round_reviews(turns, jd)
         process_review = self._build_process_review(position, live_metrics, round_reviews)
+        
+        # Analyze expressions
+        expression_records = session.get("expression_records") or []
+        emotion_counts = {}
+        total_expressions = len(expression_records)
+        for record in expression_records:
+            emotion = record.get("emotion", "neutral")
+            emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+        
+        expression_stats = {}
+        if total_expressions > 0:
+            for emotion, count in emotion_counts.items():
+                expression_stats[emotion] = f"{round((count / total_expressions) * 100)}%"
+        else:
+            expression_stats = {"info": "本次面试未采集到有效的面部表情数据"}
+
         scoring_dimensions = jd.get("scoring_dimensions") if jd else []
         dimension_names = scoring_dimensions or DEFAULT_SCORING_DIMENSIONS
         values_seed = [
@@ -631,6 +648,7 @@ class MockInterviewService:
                 "conversation_transcript": transcript,
                 "round_reviews": round_reviews,
                 "process_review": process_review,
+                "expression_stats": expression_stats,
                 "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "ai_model": interview_ai_adapter.model_name if interview_ai_adapter.enabled else "",
                 "ai_generated": False,
@@ -639,8 +657,8 @@ class MockInterviewService:
         }
         if interview_ai_adapter.enabled:
             system_prompt = (
-                "你是一位资深招聘面试官，请基于岗位信息、简历和面试对话，生成一份真实、克制、可落地的中文面试复盘。"
-                "不要出现 AI、模型、算法 等表述，不要编造未出现的经历，只返回 JSON 对象。"
+                "你是一位资深招聘面试官，请基于岗位信息、简历、面试对话和面试过程表情分析数据，生成一份真实、克制、可落地的中文面试复盘。"
+                "不要出现 AI、模型、算法 等表述，不要编造未出现的经历，如果提供了表情数据，请在综合评价（overview）中自然地融入对候选人面试从容度和表情管理的点评。只返回 JSON 对象。"
             )
             user_prompt = (
                 '请严格返回 JSON：'
@@ -656,7 +674,8 @@ class MockInterviewService:
                 f"\n面试对话：{self._json_dump(turns)}"
                 f"\n轮次回看：{self._json_dump(round_reviews)}"
                 f"\n实时指标：{self._json_dump(live_metrics)}"
-                "\n要求：1. 结论要像真实面试复盘；2. 必须体现对话过程和回答深度；3. 每个列表控制在 3 条以内；4. 建议要具体可执行。"
+                f"\n面试过程表情分析数据：{self._json_dump(expression_stats)}"
+                "\n要求：1. 结论要像真实面试复盘；2. 必须体现对话过程和回答深度，并结合表情数据评价候选人从容度；3. 每个列表控制在 3 条以内；4. 建议要具体可执行。"
             )
             ai_result = await interview_ai_adapter.generate_json(
                 system_prompt,
@@ -874,6 +893,27 @@ class MockInterviewService:
             "turn": await interview_controller.serialize_turn(turn),
             "metrics": metrics,
         }
+
+    async def submit_expression_frame(self, user_id: int, session_id: int, image_base64: str):
+        session = await interview_controller.get(id=session_id)
+        if session.user_id != user_id or session.status != "running":
+            return
+
+        emotion = await expression_service.analyze_expression_from_base64(image_base64)
+        if emotion:
+            # We don't want to lose updates from other concurrent requests,
+            # but since this is low frequency, a simple update is fine.
+            # Fetch latest again to be safer.
+            session = await interview_controller.get(id=session_id)
+            current_records = session.expression_records or []
+            current_records.append({
+                "time": datetime.now().strftime("%H:%M:%S"),
+                "emotion": emotion
+            })
+            await interview_controller.update(
+                id=session.id,
+                obj_in={"expression_records": current_records},
+            )
 
     async def next_question(self, user_id: int, session_id: int):
         session = await interview_controller.get(id=session_id)

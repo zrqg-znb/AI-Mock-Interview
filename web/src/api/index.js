@@ -83,6 +83,7 @@ export default {
   startMockInterview: (data = {}) =>
     request.post('/mock_interview/start', data, { timeout: 45000 }),
   submitMockInterviewSegment: (data = {}) => request.post('/mock_interview/submit_segment', data),
+  submitExpressionFrame: (data = {}) => request.post('/mock_interview/submit_expression_frame', data),
   nextMockInterviewQuestion: (data = {}) =>
     request.post('/mock_interview/next_question', data, { timeout: 30000 }),
   finishMockInterview: (data = {}) =>
