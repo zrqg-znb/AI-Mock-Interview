@@ -325,7 +325,6 @@ watch(
 onMounted(() => {
   hydrateSession()
   void setupCamera()
-  startExpressionCapture()
   void nextTick(() => {
     scrollToBottom()
   })
@@ -387,6 +386,8 @@ async function setupCamera() {
       videoRef.value.srcObject = mediaStream
     }
     cameraError.value = ''
+    void captureAndSubmitExpression()
+    startExpressionCapture()
   } catch {
     cameraError.value = '摄像头或麦克风权限被拒绝，请检查浏览器权限设置。'
   }
@@ -417,7 +418,7 @@ async function captureAndSubmitExpression() {
 
   const video = videoRef.value
   const canvas = canvasRef.value
-  
+
   if (video.videoWidth === 0 || video.videoHeight === 0) return
 
   try {
@@ -425,22 +426,24 @@ async function captureAndSubmitExpression() {
     // Resize to a smaller dimension to save bandwidth and backend processing
     const targetWidth = 320
     const targetHeight = (video.videoHeight / video.videoWidth) * targetWidth
-    
+
     canvas.width = targetWidth
     canvas.height = targetHeight
-    
+
     ctx.drawImage(video, 0, 0, targetWidth, targetHeight)
-    
+
     // Convert to base64, quality 0.6
     const base64Image = canvas.toDataURL('image/jpeg', 0.6)
-    
+
     // Do not block or await here, just fire and forget
-    api.submitExpressionFrame({
-      session_id: session.value.id,
-      image_base64: base64Image
-    }).catch(err => {
-      console.warn('Failed to submit expression frame:', err)
-    })
+    api
+      .submitExpressionFrame({
+        session_id: session.value.id,
+        image_base64: base64Image,
+      })
+      .catch((err) => {
+        console.warn('Failed to submit expression frame:', err)
+      })
   } catch (err) {
     console.warn('Failed to capture video frame:', err)
   }
@@ -977,6 +980,7 @@ async function requestNextQuestion() {
 
   askingNext.value = true
   try {
+    void captureAndSubmitExpression()
     const res = await api.nextMockInterviewQuestion({ session_id: session.value.id })
     if (res.data.completed) {
       window.$message?.info('题目已经完成，可以结束练习并查看报告了。')
@@ -1018,6 +1022,7 @@ async function finishInterview() {
 
   finishing.value = true
   try {
+    void captureAndSubmitExpression()
     const res = await api.finishMockInterview({ session_id: session.value.id })
     finished.value = true
     window.sessionStorage.removeItem(`mock-session:${session.value.id}`)

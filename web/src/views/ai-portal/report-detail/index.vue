@@ -136,6 +136,73 @@
       </div>
     </div>
 
+    <div v-if="hasMultimodalSection" class="portal-card">
+      <div class="portal-row" style="align-items: flex-start">
+        <div>
+          <h2 class="portal-section-title">多模态观察</h2>
+          <p class="portal-section-subtitle">结合镜头采样结果整理出的视觉侧辅助观察。</p>
+        </div>
+      </div>
+
+      <div class="portal-grid cols-4" style="margin-top: 20px">
+        <div class="portal-kpi">
+          <p class="portal-kpi__label">主导状态</p>
+          <p class="portal-kpi__value" style="font-size: 24px">{{ dominantStateLabel }}</p>
+          <p class="portal-muted">{{ multimodalSummary.camera_stability || '数据不足' }}</p>
+        </div>
+        <div class="portal-kpi">
+          <p class="portal-kpi__label">有效样本数</p>
+          <p class="portal-kpi__value" style="font-size: 24px">
+            {{ expressionStats.valid_sample_count || 0 }}
+          </p>
+          <p class="portal-muted">共采集 {{ expressionStats.sample_count || 0 }} 帧</p>
+        </div>
+        <div class="portal-kpi">
+          <p class="portal-kpi__label">入镜率</p>
+          <p class="portal-kpi__value" style="font-size: 24px">
+            {{ expressionStats.face_detected_rate || 0 }}%
+          </p>
+          <p class="portal-muted">正面入镜稳定度</p>
+        </div>
+        <div class="portal-kpi">
+          <p class="portal-kpi__label">镜头环境</p>
+          <p class="portal-kpi__value" style="font-size: 24px">
+            {{ multimodalSummary.environment_quality || '待补充' }}
+          </p>
+          <p class="portal-muted">视觉采样环境质量</p>
+        </div>
+      </div>
+
+      <div class="portal-grid cols-2" style="margin-top: 20px">
+        <div class="portal-panel" style="padding: 18px">
+          <p class="portal-kpi__label">状态分布</p>
+          <div class="portal-list" style="margin-top: 14px">
+            <div v-for="item in expressionDistributionList" :key="item.key">
+              <div class="portal-row">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}%</strong>
+              </div>
+              <n-progress
+                type="line"
+                :percentage="item.value"
+                :show-indicator="false"
+                status="success"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="portal-panel" style="padding: 18px">
+          <p class="portal-kpi__label">观察结论</p>
+          <p class="portal-muted" style="line-height: 1.9; margin-top: 12px">
+            {{ multimodalSummary.overall_comment || '当前暂无可展示的多模态结论。' }}
+          </p>
+          <ul class="portal-muted" style="padding-left: 18px; line-height: 1.9; margin-top: 12px">
+            <li v-for="item in multimodalSummary.observations || []" :key="item">{{ item }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <div v-if="roundReviews.length" class="portal-card">
       <div class="portal-row" style="align-items: flex-start">
         <div>
@@ -274,6 +341,31 @@ const reportPayload = computed(() => report.value.report_payload || {})
 const processReview = computed(() => reportPayload.value.process_review || {})
 const roundReviews = computed(() => reportPayload.value.round_reviews || [])
 const conversationTranscript = computed(() => reportPayload.value.conversation_transcript || [])
+const expressionStats = computed(() => reportPayload.value.expression_stats || {})
+const multimodalSummary = computed(() => reportPayload.value.multimodal_summary || {})
+const emotionLabelMap = {
+  positive: '自然积极',
+  steady: '自然平稳',
+  tense: '略显紧张',
+  off_camera: '未稳定入镜',
+}
+const dominantStateLabel = computed(() => {
+  const key = expressionStats.value.dominant_state
+  return emotionLabelMap[key] || '未稳定入镜'
+})
+const expressionDistributionList = computed(() => {
+  const distribution = expressionStats.value.distribution || {}
+  return ['positive', 'steady', 'tense', 'off_camera'].map((key) => ({
+    key,
+    label: emotionLabelMap[key],
+    value: distribution[key] ?? 0,
+  }))
+})
+const hasMultimodalSection = computed(
+  () =>
+    Boolean(expressionStats.value.sample_count || expressionStats.value.valid_sample_count) ||
+    Boolean(multimodalSummary.value.overall_comment)
+)
 const reportStatusText = computed(() => {
   const status = report.value.archive_status
   if (status === 'generating') return '生成中'

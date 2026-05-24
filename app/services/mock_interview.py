@@ -25,6 +25,10 @@ _NEXT_QUESTION_TIMEOUT_SECONDS = 8
 
 
 class MockInterviewService:
+    _MULTIMODAL_EMPTY_COMMENT = (
+        "本次镜头数据不足，系统仍保留了基础多模态观察结果，建议在光线稳定、正面入镜条件下再次练习。"
+    )
+
     @staticmethod
     def _extract_terms(*parts: Any) -> set[str]:
         terms: set[str] = set()
@@ -327,6 +331,130 @@ class MockInterviewService:
             )
         return normalized or fallback
 
+    def _aggregate_expression_records(self, expression_records: list[dict[str, Any]]) -> tuple[dict[str, Any], dict[str, Any]]:
+        stable_emotions = ("positive", "steady", "tense", "off_camera")
+        sample_count = len(expression_records)
+        valid_records = [item for item in expression_records if isinstance(item, dict) and item.get("emotion")]
+        valid_sample_count = len(valid_records)
+        if not valid_sample_count:
+            return (
+                {
+                    "sample_count": sample_count,
+                    "valid_sample_count": 0,
+                    "source_breakdown": {},
+                    "distribution": {emotion: 0 for emotion in stable_emotions},
+                    "dominant_state": "off_camera",
+                    "face_detected_rate": 0,
+                },
+                {
+                    "camera_stability": "数据不足",
+                    "environment_quality": "待补充",
+                    "overall_comment": self._MULTIMODAL_EMPTY_COMMENT,
+                    "observations": [
+                        "本次未形成稳定的镜头采样结果。",
+                        "建议保持正面入镜，并让光线更均匀。",
+                    ],
+                },
+            )
+
+        source_breakdown: dict[str, int] = {}
+        emotion_counts = {emotion: 0 for emotion in stable_emotions}
+        detected_faces = 0
+        quality_scores: list[int] = []
+        off_camera_count = 0
+        for record in valid_records:
+            source = str(record.get("source") or "heuristic")
+            source_breakdown[source] = source_breakdown.get(source, 0) + 1
+            emotion = str(record.get("emotion") or "steady")
+            if emotion not in emotion_counts:
+                emotion = "steady"
+            emotion_counts[emotion] += 1
+            off_camera_count += 1 if emotion == "off_camera" else 0
+            if record.get("face_detected"):
+                detected_faces += 1
+            try:
+                quality_scores.append(int(record.get("quality_score") or 0))
+            except (TypeError, ValueError):
+                pass
+
+        distribution: dict[str, int] = {}
+        for emotion in stable_emotions:
+            distribution[emotion] = round(emotion_counts[emotion] / valid_sample_count * 100)
+        distribution_total = sum(distribution.values())
+        if distribution_total != 100:
+            dominant_distribution = max(
+                stable_emotions,
+                key=lambda emotion: (
+                    distribution[emotion],
+                    -expression_service.emotion_priority(emotion),
+                ),
+            )
+            distribution[dominant_distribution] += 100 - distribution_total
+
+        dominant_state = max(
+            stable_emotions,
+            key=lambda emotion: (
+                distribution[emotion],
+                -expression_service.emotion_priority(emotion),
+            ),
+        )
+        face_detected_rate = round(detected_faces / valid_sample_count * 100)
+        average_quality = round(sum(quality_scores) / len(quality_scores)) if quality_scores else 0
+
+        if face_detected_rate >= 75:
+            camera_stability = "较稳定"
+        elif face_detected_rate >= 45:
+            camera_stability = "基本稳定"
+        else:
+            camera_stability = "波动较大"
+
+        if average_quality >= 75:
+            environment_quality = "良好"
+        elif average_quality >= 50:
+            environment_quality = "一般"
+        else:
+            environment_quality = "待优化"
+
+        observations: list[str] = []
+        if dominant_state == "steady":
+            observations.append("面部状态整体平稳，镜头中的表达节奏较自然。")
+        elif dominant_state == "positive":
+            observations.append("表情整体偏积极，镜头参与度和自然度较好。")
+        elif dominant_state == "tense":
+            observations.append("镜头中可见一定紧张感，建议练习时进一步放松表达。")
+        else:
+            observations.append("存在较多未稳定入镜片段，镜头参与度仍有提升空间。")
+
+        observations.append(
+            "镜头参与度较好。" if face_detected_rate >= 70 else "正面入镜时长一般，建议尽量保持视线稳定。"
+        )
+        if off_camera_count > 0:
+            observations.append("个别时段存在短暂偏离镜头。")
+        if environment_quality == "待优化":
+            observations.append("画面清晰度或光线条件一般，建议在更稳定环境下练习。")
+
+        overall_comment = (
+            f"候选人大部分时间能够{camera_stability.replace('较', '') if camera_stability == '较稳定' else camera_stability}入镜，"
+            f"整体表情以{expression_service.emotion_label(dominant_state)}为主。"
+        )
+
+        return (
+            {
+                "sample_count": sample_count,
+                "valid_sample_count": valid_sample_count,
+                "source_breakdown": source_breakdown,
+                "distribution": distribution,
+                "dominant_state": dominant_state,
+                "face_detected_rate": face_detected_rate,
+            },
+            {
+                "camera_stability": camera_stability,
+                "environment_quality": environment_quality,
+                "overall_comment": overall_comment,
+                "observations": observations[:3],
+            },
+        )
+
     def _build_generating_report_payload(
         self,
         session: dict,
@@ -338,6 +466,9 @@ class MockInterviewService:
         live_metrics = self.build_live_metrics(jd, user_turns)
         round_reviews = self._build_round_reviews(turns, jd)
         process_review = self._build_process_review(position, live_metrics, round_reviews)
+        expression_stats, multimodal_summary = self._aggregate_expression_records(
+            session.get("expression_records") or []
+        )
         return {
             "total_score": 0,
             "dimension_scores": {},
@@ -357,6 +488,8 @@ class MockInterviewService:
                 "conversation_transcript": self._build_transcript(turns),
                 "round_reviews": round_reviews,
                 "process_review": process_review,
+                "expression_stats": expression_stats,
+                "multimodal_summary": multimodal_summary,
             },
         }
 
@@ -579,21 +712,9 @@ class MockInterviewService:
         transcript = self._build_transcript(turns)
         round_reviews = self._build_round_reviews(turns, jd)
         process_review = self._build_process_review(position, live_metrics, round_reviews)
-        
-        # Analyze expressions
-        expression_records = session.get("expression_records") or []
-        emotion_counts = {}
-        total_expressions = len(expression_records)
-        for record in expression_records:
-            emotion = record.get("emotion", "neutral")
-            emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
-        
-        expression_stats = {}
-        if total_expressions > 0:
-            for emotion, count in emotion_counts.items():
-                expression_stats[emotion] = f"{round((count / total_expressions) * 100)}%"
-        else:
-            expression_stats = {"info": "本次面试未采集到有效的面部表情数据"}
+        expression_stats, multimodal_summary = self._aggregate_expression_records(
+            session.get("expression_records") or []
+        )
 
         scoring_dimensions = jd.get("scoring_dimensions") if jd else []
         dimension_names = scoring_dimensions or DEFAULT_SCORING_DIMENSIONS
@@ -630,7 +751,7 @@ class MockInterviewService:
             recommended_positions.append(position.get("category"))
         overview = (
             f"这次 {position.get('title')} 练习总体得分 {total_score} 分。候选人在岗位关键词覆盖、表达完整度和沟通稳定性方面表现较稳。"
-            "如果能补充更具体的数据结果，并在情景题里把判断过程讲清楚，整体表现还会更进一步。"
+            f"{multimodal_summary['overall_comment']} 如果能补充更具体的数据结果，并在情景题里把判断过程讲清楚，整体表现还会更进一步。"
         )
         payload = {
             "total_score": total_score,
@@ -649,6 +770,7 @@ class MockInterviewService:
                 "round_reviews": round_reviews,
                 "process_review": process_review,
                 "expression_stats": expression_stats,
+                "multimodal_summary": multimodal_summary,
                 "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "ai_model": interview_ai_adapter.model_name if interview_ai_adapter.enabled else "",
                 "ai_generated": False,
@@ -675,6 +797,7 @@ class MockInterviewService:
                 f"\n轮次回看：{self._json_dump(round_reviews)}"
                 f"\n实时指标：{self._json_dump(live_metrics)}"
                 f"\n面试过程表情分析数据：{self._json_dump(expression_stats)}"
+                f"\n多模态观察结论：{self._json_dump(multimodal_summary)}"
                 "\n要求：1. 结论要像真实面试复盘；2. 必须体现对话过程和回答深度，并结合表情数据评价候选人从容度；3. 每个列表控制在 3 条以内；4. 建议要具体可执行。"
             )
             ai_result = await interview_ai_adapter.generate_json(
@@ -899,17 +1022,23 @@ class MockInterviewService:
         if session.user_id != user_id or session.status != "running":
             return
 
-        emotion = await expression_service.analyze_expression_from_base64(image_base64)
-        if emotion:
+        analysis = await expression_service.analyze_expression_from_base64(image_base64)
+        if analysis:
             # We don't want to lose updates from other concurrent requests,
             # but since this is low frequency, a simple update is fine.
             # Fetch latest again to be safer.
             session = await interview_controller.get(id=session_id)
             current_records = session.expression_records or []
-            current_records.append({
-                "time": datetime.now().strftime("%H:%M:%S"),
-                "emotion": emotion
-            })
+            current_records.append(
+                {
+                    "time": datetime.now().strftime("%H:%M:%S"),
+                    "emotion": analysis.get("emotion", "steady"),
+                    "source": analysis.get("source", "heuristic"),
+                    "face_detected": bool(analysis.get("face_detected")),
+                    "quality_score": int(analysis.get("quality_score") or 0),
+                    "observation": self._safe_text(analysis.get("observation")),
+                }
+            )
             await interview_controller.update(
                 id=session.id,
                 obj_in={"expression_records": current_records},
